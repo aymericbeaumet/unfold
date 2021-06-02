@@ -12,6 +12,7 @@ const vectorSource = new VectorSource({ format: new GeoJSON() });
 const vectorLayer = new VectorLayer({ source: vectorSource });
 
 const map = new Map({
+  controls: [],
   target: document.getElementById("map"),
   layers: [vectorLayer],
   view: new View({
