@@ -9,41 +9,57 @@ import landURL from "url:./data/land.geojson";
 import riversURL from "url:./data/rivers.geojson";
 
 const vectorSource = new VectorSource({ format: new GeoJSON() });
+const vectorLayer = new VectorLayer({ source: vectorSource });
 
-new Map({
+const map = new Map({
   target: document.getElementById("map"),
-  layers: [new VectorLayer({ source: vectorSource })],
+  layers: [vectorLayer],
   view: new View({
     center: [0, 0],
     zoom: 2,
   }),
 });
 
+map.on("click", async function (event) {
+  const features = await vectorLayer.getFeatures(event.pixel);
+  const property = features[0]?.getProperties();
+  if (property?.kind === "city") {
+    window.open(
+      `https://duckduckgo.com/?q=${encodeURIComponent(
+        `!ducky site:en.wikipedia.org ${property.nameascii}, ${property.sov0name}`
+      )}`,
+      "_blank"
+    );
+  }
+});
+
 // Populate the vector source
 [
   {
+    kind: "city",
     url: citiesURL,
     style: new Style({
       image: new Circle({
-        radius: 1,
+        radius: 5,
         fill: new Fill({ color: "#000000" }),
-        stroke: new Stroke({ color: "#000000", width: 1 }),
       }),
     }),
   },
   {
+    kind: "land",
     url: landURL,
     style: new Style({
       fill: new Fill({ color: "#808000" }),
     }),
   },
   {
+    kind: "river",
     url: riversURL,
     style: new Style({
       stroke: new Stroke({ color: "#000000", width: 1 }),
     }),
   },
-].forEach(async ({ url, style }) => {
+].forEach(async ({ kind, url, style }) => {
   const res = await fetch(url);
   const json = await res.json();
 
@@ -51,6 +67,7 @@ new Map({
     .getFormat()
     .readFeatures(json, { featureProjection: "EPSG:3857" });
   for (const feature of features) {
+    feature.setProperties({ kind });
     feature.setStyle(style);
   }
 
