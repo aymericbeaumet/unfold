@@ -93,8 +93,10 @@ document.addEventListener("click", function (event) {
     switch (event.target.getAttribute("data-action")) {
       case "fullscreen":
         mapElement.requestFullscreen();
+        break;
       case "sourcecode":
         window.open("https://github.com/aymericbeaumet/retromap", "_blank");
+        break;
     }
   }
   contextMenuElement.classList.remove("visible");
