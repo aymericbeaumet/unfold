@@ -4,9 +4,9 @@ import { Circle, Fill, Stroke, Style } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 
-import citiesURL from "url:./data/cities.geojson";
-import landURL from "url:./data/land.geojson";
-import riversURL from "url:./data/rivers.geojson";
+import citiesURL from "url:./static/geojson/cities.geojson";
+import landURL from "url:./static/geojson/land.geojson";
+import riversURL from "url:./static/geojson/rivers.geojson";
 
 const vectorSource = new VectorSource({ format: new GeoJSON() });
 const vectorLayer = new VectorLayer({ source: vectorSource });
