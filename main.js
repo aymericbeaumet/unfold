@@ -74,3 +74,28 @@ map.on("click", async function (event) {
 
   vectorSource.addFeatures(features);
 });
+
+// Context Menu
+
+const mapElement = document.getElementById("map");
+const contextMenuElement = document.getElementById("context-menu");
+
+document.addEventListener("contextmenu", function (event) {
+  event.preventDefault();
+  contextMenuElement.classList.remove("visible");
+  contextMenuElement.style.top = `${event.clientY}px`;
+  contextMenuElement.style.left = `${event.clientX}px`;
+  contextMenuElement.classList.add("visible");
+});
+
+document.addEventListener("click", function (event) {
+  if (event.target.offsetParent === contextMenuElement) {
+    switch (event.target.getAttribute("data-action")) {
+      case "fullscreen":
+        mapElement.requestFullscreen();
+      case "sourcecode":
+        window.open("https://github.com/aymericbeaumet/retromap", "_blank");
+    }
+  }
+  contextMenuElement.classList.remove("visible");
+});
