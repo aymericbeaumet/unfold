@@ -5,10 +5,6 @@ import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { transform } from "ol/proj";
 
-import citiesURL from "url:./static/geojson/cities.geojson";
-import landURL from "url:./static/geojson/land.geojson";
-import riversURL from "url:./static/geojson/rivers.geojson";
-
 const vectorSource = new VectorSource({ format: new GeoJSON() });
 const vectorLayer = new VectorLayer({ source: vectorSource });
 
@@ -38,27 +34,10 @@ map.on("click", async function (event) {
 // Populate the vector source
 [
   {
-    kind: "city",
-    url: citiesURL,
-    style: new Style({
-      image: new Circle({
-        radius: 5,
-        fill: new Fill({ color: "#000000" }),
-      }),
-    }),
-  },
-  {
     kind: "land",
-    url: landURL,
+    url: "http://localhost:9090/data/land.geojson",
     style: new Style({
       fill: new Fill({ color: "#808000" }),
-    }),
-  },
-  {
-    kind: "river",
-    url: riversURL,
-    style: new Style({
-      stroke: new Stroke({ color: "#000000", width: 1 }),
     }),
   },
 ].forEach(async ({ kind, url, style }) => {
