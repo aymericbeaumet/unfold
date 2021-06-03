@@ -3,6 +3,7 @@ import VectorSource from "ol/source/Vector";
 import { Circle, Fill, Stroke, Style } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
+import { transform } from "ol/proj";
 
 import citiesURL from "url:./static/geojson/cities.geojson";
 import landURL from "url:./static/geojson/land.geojson";
@@ -79,25 +80,59 @@ map.on("click", async function (event) {
 
 const mapElement = document.getElementById("map");
 const contextMenuElement = document.getElementById("context-menu");
+const coordinatesElement = contextMenuElement.querySelector(
+  '[data-action="coordinates"]'
+);
 
-document.addEventListener("contextmenu", function (event) {
+map.on("contextmenu", function (event) {
   event.preventDefault();
-  contextMenuElement.classList.remove("visible");
-  contextMenuElement.style.top = `${event.clientY}px`;
-  contextMenuElement.style.left = `${event.clientX}px`;
+
+  const [lng, lat] = transform(event.coordinate, "EPSG:3857", "EPSG:4326");
+
+  coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  coordinatesElement.setAttribute("data-latlng", `${lat}, ${lng}`);
+
+  let x = event.originalEvent.clientX;
+  const clientXDelta =
+    x + contextMenuElement.offsetWidth - document.body.offsetWidth;
+  if (clientXDelta > 0) {
+    x -= clientXDelta;
+  }
+
+  let y = event.originalEvent.clientY;
+  const clientYDelta =
+    y + contextMenuElement.offsetHeight - document.body.offsetHeight;
+  if (clientYDelta > 0) {
+    y -= clientYDelta;
+  }
+
+  contextMenuElement.style.top = `${y}px`;
+  contextMenuElement.style.left = `${x}px`;
   contextMenuElement.classList.add("visible");
 });
 
-document.addEventListener("click", function (event) {
-  if (event.target.offsetParent === contextMenuElement) {
-    switch (event.target.getAttribute("data-action")) {
-      case "fullscreen":
-        mapElement.requestFullscreen();
-        break;
-      case "sourcecode":
-        window.open("https://github.com/aymericbeaumet/retromap", "_blank");
-        break;
+document.body.addEventListener(
+  "mousedown",
+  function (event) {
+    event.preventDefault();
+
+    if (event.target.offsetParent === contextMenuElement) {
+      switch (event.target.getAttribute("data-action")) {
+        case "coordinates":
+          navigator.clipboard.writeText(
+            coordinatesElement.getAttribute("data-latlng")
+          );
+          break;
+        case "fullscreen":
+          mapElement.requestFullscreen();
+          break;
+        case "sourcecode":
+          window.open("https://github.com/aymericbeaumet/retromap", "_blank");
+          break;
+      }
     }
-  }
-  contextMenuElement.classList.remove("visible");
-});
+
+    contextMenuElement.classList.remove("visible");
+  },
+  true
+);
