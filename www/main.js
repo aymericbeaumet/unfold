@@ -5,53 +5,42 @@ import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { transform } from "ol/proj";
 
-const vectorSource = new VectorSource({ format: new GeoJSON() });
-const vectorLayer = new VectorLayer({ source: vectorSource });
+const landStyle = new Style({
+  fill: new Fill({ color: "#808000" }),
+});
+
+const cityStyle = new Style({
+  image: new Circle({
+    radius: 5,
+    fill: new Fill({ color: "#000000" }),
+  }),
+});
 
 const map = new Map({
   controls: [],
   target: document.getElementById("map"),
-  layers: [vectorLayer],
+  layers: [
+    new VectorLayer({
+      source: new VectorSource({
+        format: new GeoJSON(),
+        url: "http://localhost:9090/data/lands",
+      }),
+      style: landStyle,
+    }),
+    new VectorLayer({
+      source: new VectorSource({
+        format: new GeoJSON(),
+        url: "http://localhost:9090/data/cities",
+      }),
+      style: cityStyle,
+    }),
+  ],
   view: new View({
-    center: [0, 0],
     center: transform([2.3522, 48.8566], "EPSG:4326", "EPSG:3857"),
     zoom: 6,
     smoothResolutionConstraint: false,
   }),
 });
-
-// Populate the vector source
-[
-  {
-    url: "http://localhost:9090/data/cities",
-    style: new Style({
-      image: new Circle({
-        radius: 5,
-        fill: new Fill({ color: "#000000" }),
-      }),
-    }),
-  },
-  {
-    url: "http://localhost:9090/data/lands",
-    style: new Style({
-      fill: new Fill({ color: "#808000" }),
-    }),
-  },
-].forEach(async ({ url, style }) => {
-  const res = await fetch(url);
-  const json = await res.json();
-
-  const features = vectorSource
-    .getFormat()
-    .readFeatures(json, { featureProjection: "EPSG:3857" });
-  for (const feature of features) {
-    feature.setStyle(style);
-  }
-
-  vectorSource.addFeatures(features);
-});
-
-// Context Menu
 
 const mapElement = document.getElementById("map");
 const contextMenuElement = document.getElementById("context-menu");
