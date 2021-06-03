@@ -4,35 +4,43 @@ import { Fill, Style, Circle } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { transform } from "ol/proj";
-
-const landStyle = new Style({
-  fill: new Fill({ color: "#808000" }),
-});
-
-const cityStyle = new Style({
-  image: new Circle({
-    radius: 5,
-    fill: new Fill({ color: "#000000" }),
-  }),
-});
+import * as loadingstrategy from "ol/loadingstrategy";
 
 const map = new Map({
   controls: [],
   target: document.getElementById("map"),
   layers: [
+    // Display all lands
     new VectorLayer({
       source: new VectorSource({
         format: new GeoJSON(),
+        strategy: loadingstrategy.all,
         url: "http://localhost:9090/data/lands",
       }),
-      style: landStyle,
+      style: new Style({
+        fill: new Fill({ color: "#808000" }),
+      }),
     }),
+    // Display cities in the current bounding box
     new VectorLayer({
       source: new VectorSource({
         format: new GeoJSON(),
-        url: "http://localhost:9090/data/cities",
+        strategy: loadingstrategy.bbox,
+        loader: async function (extent, resolution, projection) {
+          const res = await fetch("http://localhost:9090/data/cities");
+          const json = await res.json();
+          const features = this.getFormat().readFeatures(json, {
+            featureProjection: "EPSG:3857",
+          });
+          this.addFeatures(features);
+        },
       }),
-      style: cityStyle,
+      style: new Style({
+        image: new Circle({
+          radius: 5,
+          fill: new Fill({ color: "#000000" }),
+        }),
+      }),
     }),
   ],
   view: new View({
