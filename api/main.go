@@ -3,7 +3,6 @@ package main
 import (
 	"archive/zip"
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	geojson "github.com/paulmach/go.geojson"
 )
 
 var httpClient = http.Client{
@@ -26,17 +26,16 @@ func main() {
 
 	r := gin.Default()
 
-	r.GET("/data/cities", func(c *gin.Context) {
-		bbox := strings.Split(c.Query("bbox"), ",")
-		bottomleftLon := bbox[0]
-		bottomleftLat := bbox[1]
-		toprightLon := bbox[2]
-		toprightLat := bbox[3]
+	r.GET("/data/features", func(c *gin.Context) {
+		results := data.Index.FindInBox(parseBox(c.Query("bbox")))
 
-		fmt.Printf("%s, %s\n", bottomleftLat, bottomleftLon)
-		fmt.Printf("%s, %s\n", toprightLat, toprightLon)
+		fc := geojson.NewFeatureCollection()
+		for _, result := range results {
+			city := result.(*City)
+			fc.AddFeature(geojson.NewPointFeature([]float64{city.lon, city.lat}))
+		}
 
-		c.JSON(http.StatusOK, data.Cities)
+		c.JSON(http.StatusOK, fc)
 	})
 
 	r.GET("/data/lands", func(c *gin.Context) {
@@ -49,24 +48,8 @@ func main() {
 }
 
 type Data struct {
-	Cities    Cities
+	Index     *Index
 	LandsJSON []byte
-}
-
-type Cities struct {
-	Type     string         `json:"type"`
-	Features []*CityFeature `json:"features"`
-}
-
-type CityFeature struct {
-	Type       string              `json:"type"`
-	Geometry   CityFeatureGeometry `json:"geometry"`
-	Properties map[string]string   `json:"properties"`
-}
-
-type CityFeatureGeometry struct {
-	Type        string    `json:"type"`
-	Coordinates []float64 `json:"coordinates"`
 }
 
 func loadData(dataDir string) Data {
@@ -117,9 +100,7 @@ func loadData(dataDir string) Data {
 
 	// cities
 
-	cities := Cities{
-		Type: "FeatureCollection",
-	}
+	index := NewIndex()
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
@@ -141,22 +122,7 @@ func loadData(dataDir string) Data {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
-
-			population := parseFloat(records[14])
-			if population < 1000000 {
-				continue
-			}
-
-			cities.Features = append(cities.Features, &CityFeature{
-				Type: "Feature",
-				Geometry: CityFeatureGeometry{
-					Type:        "Point",
-					Coordinates: []float64{parseFloat(records[5]), parseFloat(records[4])},
-				},
-				Properties: map[string]string{
-					"Name": records[2],
-				},
-			})
+			index.Insert(NewCity(records[2], parseFloat(records[5]), parseFloat(records[4])))
 		}
 
 		if err := scanner.Err(); err != nil {
@@ -172,7 +138,7 @@ func loadData(dataDir string) Data {
 	}
 
 	return Data{
-		Cities:    cities,
+		Index:     index,
 		LandsJSON: lands,
 	}
 }
@@ -183,4 +149,13 @@ func parseFloat(s string) float64 {
 		panic(err)
 	}
 	return n
+}
+
+func parseBox(s string) (float64, float64, float64, float64) {
+	split := strings.Split(s, ",")
+	minLon := parseFloat(split[0])
+	minLat := parseFloat(split[1])
+	maxLon := parseFloat(split[2])
+	maxLat := parseFloat(split[3])
+	return minLon, maxLon, minLat, maxLat
 }

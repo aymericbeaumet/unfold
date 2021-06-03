@@ -2,4 +2,8 @@ module github.com/aymericbeaumet/retromap
 
 go 1.16
 
-require github.com/gin-gonic/gin v1.7.2
+require (
+	github.com/gin-gonic/gin v1.7.2
+	github.com/mmcloughlin/geohash v0.10.0
+	github.com/paulmach/go.geojson v1.4.0
+)

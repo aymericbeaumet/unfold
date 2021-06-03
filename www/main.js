@@ -26,13 +26,13 @@ const map = new Map({
         fill: new Fill({ color: "#808000" }),
       }),
     }),
-    // Display cities in the current bounding box
+    // Display features in the current bounding box
     new VectorLayer({
       source: new VectorSource({
         format: new GeoJSON(),
         strategy: loadingstrategy.bbox,
         url: function (extent, resolution, projection) {
-          return `http://localhost:9090/data/cities?bbox=${encodeURIComponent(
+          return `http://localhost:9090/data/features?bbox=${encodeURIComponent(
             toLonLat(extent, "EPSG:3857", "EPSG:4326").join(",")
           )}`;
         },
