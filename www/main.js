@@ -1,6 +1,6 @@
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Fill, Style } from "ol/style";
+import { Fill, Style, Circle } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { transform } from "ol/proj";
@@ -14,12 +14,23 @@ const map = new Map({
   layers: [vectorLayer],
   view: new View({
     center: [0, 0],
-    zoom: 2,
+    center: transform([2.3522, 48.8566], "EPSG:4326", "EPSG:3857"),
+    zoom: 6,
+    smoothResolutionConstraint: false,
   }),
 });
 
 // Populate the vector source
 [
+  {
+    url: "http://localhost:9090/data/cities",
+    style: new Style({
+      image: new Circle({
+        radius: 5,
+        fill: new Fill({ color: "#000000" }),
+      }),
+    }),
+  },
   {
     url: "http://localhost:9090/data/land",
     style: new Style({
