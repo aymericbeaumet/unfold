@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -26,6 +27,15 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/data/cities", func(c *gin.Context) {
+		bbox := strings.Split(c.Query("bbox"), ",")
+		bottomleftLon := bbox[0]
+		bottomleftLat := bbox[1]
+		toprightLon := bbox[2]
+		toprightLat := bbox[3]
+
+		fmt.Printf("%s, %s\n", bottomleftLat, bottomleftLon)
+		fmt.Printf("%s, %s\n", toprightLat, toprightLon)
+
 		c.JSON(http.StatusOK, data.Cities)
 	})
 

@@ -3,16 +3,16 @@ import VectorSource from "ol/source/Vector";
 import { Fill, Style, Circle } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
-import { transform } from "ol/proj";
+import { fromLonLat, toLonLat } from "ol/proj";
 import * as loadingstrategy from "ol/loadingstrategy";
 
 const map = new Map({
   target: document.getElementById("map"),
   controls: [],
   view: new View({
-    center: transform([2.3522, 48.8566], "EPSG:4326", "EPSG:3857"),
-    zoom: 6,
+    center: fromLonLat([2.3522, 48.8566]),
     smoothResolutionConstraint: false,
+    zoom: 6,
   }),
   layers: [
     // Display all lands
@@ -31,13 +31,10 @@ const map = new Map({
       source: new VectorSource({
         format: new GeoJSON(),
         strategy: loadingstrategy.bbox,
-        loader: async function (extent, resolution, projection) {
-          const res = await fetch("http://localhost:9090/data/cities");
-          const json = await res.json();
-          const features = this.getFormat().readFeatures(json, {
-            featureProjection: "EPSG:3857",
-          });
-          this.addFeatures(features);
+        url: function (extent, resolution, projection) {
+          return `http://localhost:9090/data/cities?bbox=${encodeURIComponent(
+            toLonLat(extent, "EPSG:3857", "EPSG:4326").join(",")
+          )}`;
         },
       }),
       style: new Style({
@@ -59,10 +56,10 @@ const coordinatesElement = contextMenuElement.querySelector(
 map.on("contextmenu", function (event) {
   event.preventDefault();
 
-  const [lng, lat] = transform(event.coordinate, "EPSG:3857", "EPSG:4326");
+  const [lon, lat] = toLonLat(event.coordinate);
 
-  coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  coordinatesElement.setAttribute("data-latlng", `${lat}, ${lng}`);
+  coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  coordinatesElement.setAttribute("data-latlon", `${lat}, ${lon}`);
 
   let x = event.originalEvent.clientX;
   const clientXDelta =
@@ -92,7 +89,7 @@ document.body.addEventListener(
       switch (event.target.getAttribute("data-action")) {
         case "coordinates":
           navigator.clipboard.writeText(
-            coordinatesElement.getAttribute("data-latlng")
+            coordinatesElement.getAttribute("data-latlon")
           );
           break;
         case "fullscreen":
