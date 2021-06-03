@@ -17,13 +17,13 @@ var httpClient = http.Client{
 }
 
 func main() {
-	data := download("./data/")
+	data := prepareData("./data/")
 	log.Println("Initialization done")
 
 	r := gin.Default()
 
 	r.GET("/data/land.geojson", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data["land.geojson"])
+		c.Data(http.StatusOK, "application/json", data.Land)
 	})
 
 	if err := r.Run(":9090"); err != nil {
@@ -31,18 +31,22 @@ func main() {
 	}
 }
 
-func download(dataDir string) map[string][]byte {
-	in := map[string]string{
-		"cities.zip":   "https://download.geonames.org/export/dump/cities500.zip",
-		"land.geojson": "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
-	}
-	out := make(map[string][]byte, len(in))
+type Data struct {
+	Cities []byte
+	Land   []byte
+}
 
+func prepareData(dataDir string) Data {
 	var wg sync.WaitGroup
-	for name, url := range in {
+	for _, url := range []string{
+		"https://download.geonames.org/export/dump/cities500.zip",
+		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
+	} {
 		wg.Add(1)
-		go func(name, url string) {
+		go func(url string) {
 			defer wg.Done()
+
+			name := filepath.Base(url)
 
 			path := filepath.Join(dataDir, name)
 			if _, err := os.Stat(path); err == nil {
@@ -73,17 +77,22 @@ func download(dataDir string) map[string][]byte {
 			if _, err := io.Copy(f, resp.Body); err != nil {
 				log.Fatalln(err)
 			}
-		}(name, url)
+		}(url)
 	}
 	wg.Wait()
 
-	for name := range in {
-		bytes, err := os.ReadFile(filepath.Join(dataDir, name))
-		if err != nil {
-			log.Fatalln(err)
-		}
-		out[name] = bytes
+	cities, err := os.ReadFile(filepath.Join(dataDir, "cities500.zip"))
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	return out
+	land, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_land.geojson"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return Data{
+		Cities: cities,
+		Land:   land,
+	}
 }
