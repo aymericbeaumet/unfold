@@ -70,8 +70,8 @@ func loadData(dataDir string) Data {
 			defer wg.Done()
 
 			name := filepath.Base(url)
-
 			path := filepath.Join(dataDir, name)
+
 			if _, err := os.Stat(path); err == nil {
 				log.Println("Skipping", path)
 				return
@@ -86,6 +86,7 @@ func loadData(dataDir string) Data {
 			if err != nil {
 				log.Fatalln(name, err)
 			}
+			defer f.Close()
 
 			resp, err := httpClient.Get(url)
 			if err != nil {
@@ -134,7 +135,7 @@ func loadData(dataDir string) Data {
 				Type: "Feature",
 				Geometry: CityFeatureGeometry{
 					Type:        "Point",
-					Coordinates: []float64{MustParseFloat(records[5]), MustParseFloat(records[4])},
+					Coordinates: []float64{parseFloat(records[5]), parseFloat(records[4])},
 				},
 				Properties: map[string]string{
 					"Name": records[2],
@@ -160,7 +161,7 @@ func loadData(dataDir string) Data {
 	}
 }
 
-func MustParseFloat(s string) float64 {
+func parseFloat(s string) float64 {
 	n, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		panic(err)
