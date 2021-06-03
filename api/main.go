@@ -22,8 +22,12 @@ func main() {
 
 	r := gin.Default()
 
-	r.GET("/data/land.geojson", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.Land)
+	r.GET("/data/cities", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.CitiesJSON)
+	})
+
+	r.GET("/data/land", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.LandJSON)
 	})
 
 	if err := r.Run(":9090"); err != nil {
@@ -32,8 +36,8 @@ func main() {
 }
 
 type Data struct {
-	Cities []byte
-	Land   []byte
+	CitiesJSON []byte
+	LandJSON   []byte
 }
 
 func prepareData(dataDir string) Data {
@@ -92,7 +96,7 @@ func prepareData(dataDir string) Data {
 	}
 
 	return Data{
-		Cities: cities,
-		Land:   land,
+		CitiesJSON: cities,
+		LandJSON:   land,
 	}
 }

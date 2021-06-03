@@ -1,6 +1,6 @@
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Circle, Fill, Stroke, Style } from "ol/style";
+import { Fill, Style } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { transform } from "ol/proj";
@@ -18,29 +18,15 @@ const map = new Map({
   }),
 });
 
-map.on("click", async function (event) {
-  const features = await vectorLayer.getFeatures(event.pixel);
-  const property = features[0]?.getProperties();
-  if (property?.kind === "city") {
-    window.open(
-      `https://duckduckgo.com/?q=${encodeURIComponent(
-        `!ducky site:en.wikipedia.org ${property.nameascii}, ${property.sov0name}`
-      )}`,
-      "_blank"
-    );
-  }
-});
-
 // Populate the vector source
 [
   {
-    kind: "land",
-    url: "http://localhost:9090/data/land.geojson",
+    url: "http://localhost:9090/data/land",
     style: new Style({
       fill: new Fill({ color: "#808000" }),
     }),
   },
-].forEach(async ({ kind, url, style }) => {
+].forEach(async ({ url, style }) => {
   const res = await fetch(url);
   const json = await res.json();
 
@@ -48,7 +34,6 @@ map.on("click", async function (event) {
     .getFormat()
     .readFeatures(json, { featureProjection: "EPSG:3857" });
   for (const feature of features) {
-    feature.setProperties({ kind });
     feature.setStyle(style);
   }
 
