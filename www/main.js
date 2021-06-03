@@ -32,7 +32,7 @@ const map = new Map({
     }),
   },
   {
-    url: "http://localhost:9090/data/land",
+    url: "http://localhost:9090/data/lands",
     style: new Style({
       fill: new Fill({ color: "#808000" }),
     }),

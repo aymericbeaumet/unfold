@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/zip"
+	"bufio"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,17 +21,16 @@ var httpClient = http.Client{
 }
 
 func main() {
-	data := prepareData("./data/")
-	log.Println("Initialization done")
+	data := loadData("./data/")
 
 	r := gin.Default()
 
 	r.GET("/data/cities", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.CitiesJSON)
+		c.JSON(http.StatusOK, data.Cities)
 	})
 
-	r.GET("/data/land", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.LandJSON)
+	r.GET("/data/lands", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.LandsJSON)
 	})
 
 	if err := r.Run(":9090"); err != nil {
@@ -36,11 +39,27 @@ func main() {
 }
 
 type Data struct {
-	CitiesJSON []byte
-	LandJSON   []byte
+	Cities    Cities
+	LandsJSON []byte
 }
 
-func prepareData(dataDir string) Data {
+type Cities struct {
+	Type     string         `json:"type"`
+	Features []*CityFeature `json:"features"`
+}
+
+type CityFeature struct {
+	Type       string              `json:"type"`
+	Geometry   CityFeatureGeometry `json:"geometry"`
+	Properties map[string]string   `json:"properties"`
+}
+
+type CityFeatureGeometry struct {
+	Type        string    `json:"type"`
+	Coordinates []float64 `json:"coordinates"`
+}
+
+func loadData(dataDir string) Data {
 	var wg sync.WaitGroup
 	for _, url := range []string{
 		"https://download.geonames.org/export/dump/cities500.zip",
@@ -85,18 +104,66 @@ func prepareData(dataDir string) Data {
 	}
 	wg.Wait()
 
-	cities, err := os.ReadFile(filepath.Join(dataDir, "cities500.zip"))
+	// cities
+
+	cities := Cities{
+		Type: "FeatureCollection",
+	}
+
+	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer citiesZip.Close()
 
-	land, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_land.geojson"))
+	for _, file := range citiesZip.File {
+		if file.Name != "cities500.txt" {
+			log.Fatalln("unexpected file in archive")
+		}
+
+		f, err := file.Open()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			records := strings.Split(scanner.Text(), "\t")
+			cities.Features = append(cities.Features, &CityFeature{
+				Type: "Feature",
+				Geometry: CityFeatureGeometry{
+					Type:        "Point",
+					Coordinates: []float64{MustParseFloat(records[5]), MustParseFloat(records[4])},
+				},
+				Properties: map[string]string{
+					"Name": records[2],
+				},
+			})
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	// lands
+
+	lands, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_land.geojson"))
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	return Data{
-		CitiesJSON: cities,
-		LandJSON:   land,
+		Cities:    cities,
+		LandsJSON: lands,
 	}
+}
+
+func MustParseFloat(s string) float64 {
+	n, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return n
 }
