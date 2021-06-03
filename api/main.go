@@ -131,6 +131,12 @@ func loadData(dataDir string) Data {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
+
+			population := parseFloat(records[14])
+			if population < 1000000 {
+				continue
+			}
+
 			cities.Features = append(cities.Features, &CityFeature{
 				Type: "Feature",
 				Geometry: CityFeatureGeometry{

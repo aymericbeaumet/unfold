@@ -7,8 +7,13 @@ import { transform } from "ol/proj";
 import * as loadingstrategy from "ol/loadingstrategy";
 
 const map = new Map({
-  controls: [],
   target: document.getElementById("map"),
+  controls: [],
+  view: new View({
+    center: transform([2.3522, 48.8566], "EPSG:4326", "EPSG:3857"),
+    zoom: 6,
+    smoothResolutionConstraint: false,
+  }),
   layers: [
     // Display all lands
     new VectorLayer({
@@ -43,11 +48,6 @@ const map = new Map({
       }),
     }),
   ],
-  view: new View({
-    center: transform([2.3522, 48.8566], "EPSG:4326", "EPSG:3857"),
-    zoom: 6,
-    smoothResolutionConstraint: false,
-  }),
 });
 
 const mapElement = document.getElementById("map");
