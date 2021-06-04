@@ -32,8 +32,8 @@ const map = new Map({
         format: new GeoJSON(),
         strategy: loadingstrategy.bbox,
         url: function (extent, resolution, projection) {
-          return `http://localhost:9090/data/features?bbox=${encodeURIComponent(
-            toLonLat(extent, "EPSG:3857", "EPSG:4326").join(",")
+          return `http://localhost:9090/data/features?box=${encodeURIComponent(
+            toLonLat(extent).join(",")
           )}`;
         },
       }),
@@ -59,7 +59,8 @@ map.on("contextmenu", function (event) {
   const [lon, lat] = toLonLat(event.coordinate);
 
   coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  coordinatesElement.setAttribute("data-latlon", `${lat}, ${lon}`);
+  coordinatesElement.setAttribute("data-lat", lat);
+  coordinatesElement.setAttribute("data-lon", lon);
 
   let x = event.originalEvent.clientX;
   const clientXDelta =
@@ -86,10 +87,17 @@ document.body.addEventListener(
     event.preventDefault();
 
     if (event.target.offsetParent === contextMenuElement) {
+      const lat = coordinatesElement.getAttribute("data-lat");
+      const lon = coordinatesElement.getAttribute("data-lon");
       switch (event.target.getAttribute("data-action")) {
         case "coordinates":
-          navigator.clipboard.writeText(
-            coordinatesElement.getAttribute("data-latlon")
+          navigator.clipboard.writeText([lat, lon].join(", "));
+          break;
+        case "googlemaps":
+          const latlon = encodeURIComponent([lat, lon].join(","));
+          window.open(
+            `https://www.google.com/maps?q=${latlon}&ll=${latlon}&z=8`,
+            "_blank"
           );
           break;
         case "fullscreen":
