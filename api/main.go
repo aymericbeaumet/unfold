@@ -131,6 +131,7 @@ func loadData(dataDir string) Data {
 			records := strings.Split(scanner.Text(), "\t")
 			index.Insert(NewCity(
 				records[2],             // name
+				records[7],             // feature code (capital, district capital, etc)
 				parseInt(records[14]),  // population
 				parseFloat(records[5]), // longitude
 				parseFloat(records[4]), // latitude

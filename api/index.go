@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/mmcloughlin/geohash"
@@ -25,20 +26,23 @@ func NewIndex() *Index {
 
 func (index *Index) Insert(f Indexable) {
 	lon, lat := f.Coordinates()
-	hash := geohash.EncodeIntWithPrecision(lat, lon, 16)
+	hash := geohash.EncodeIntWithPrecision(lat, lon, 10)
 	index.byGeohash[hash] = append(index.byGeohash[hash], f)
 
-	for _, nhash := range geohash.NeighborsIntWithPrecision(hash, 16) {
+	for _, nhash := range geohash.NeighborsIntWithPrecision(hash, 10) {
 		index.byGeohash[nhash] = append(index.byGeohash[nhash], f)
 	}
 }
 
 func (index *Index) Find(lon, lat float64) []Indexable {
-	hash := geohash.EncodeIntWithPrecision(lat, lon, 16)
+	hash := geohash.EncodeIntWithPrecision(lat, lon, 10)
 	return index.byGeohash[hash]
 }
 
 func (index *Index) FindInBox(minLon, minLat, maxLon, maxLat float64) []Indexable {
+	lon := maxLon - minLon
+	fmt.Println(lon)
+
 	b := geohash.Box{
 		MinLng: minLon,
 		MinLat: minLat,
