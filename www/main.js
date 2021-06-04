@@ -4,6 +4,11 @@ import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
+import musicURL from "url:./static/assets/alexander-nakarada-medieval-loop-one.mp3";
+
+const audio = new Audio(musicURL);
+audio.loop = true;
+audio.play();
 
 const landStyle = new Style({
   stroke: new Stroke({ color: "#000000", width: 2 }),
