@@ -19,7 +19,7 @@ type Indexable interface {
 
 func NewIndex() *Index {
 	return &Index{
-		limit:     100,
+		limit:     10,
 		byGeohash: map[uint64][]Indexable{},
 	}
 }
@@ -28,15 +28,19 @@ func (index *Index) Insert(f Indexable) {
 	lon, lat := f.Coordinates()
 	hash := geohash.EncodeIntWithPrecision(lat, lon, 10)
 	index.byGeohash[hash] = append(index.byGeohash[hash], f)
-
-	for _, nhash := range geohash.NeighborsIntWithPrecision(hash, 10) {
-		index.byGeohash[nhash] = append(index.byGeohash[nhash], f)
-	}
 }
 
 func (index *Index) Find(lon, lat float64) []Indexable {
+	var out []Indexable
+
 	hash := geohash.EncodeIntWithPrecision(lat, lon, 10)
-	return index.byGeohash[hash]
+	out = append(out, index.byGeohash[hash]...)
+
+	for _, nhash := range geohash.NeighborsIntWithPrecision(hash, 10) {
+		out = append(out, index.byGeohash[nhash]...)
+	}
+
+	return out
 }
 
 func (index *Index) FindInBox(minLon, minLat, maxLon, maxLat float64) []Indexable {

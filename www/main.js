@@ -54,11 +54,6 @@ const map = new Map({
           return `http://localhost:9999/data/features?bbox=${bbox}`;
         },
         strategy(extent) {
-          var bbox = extent.join(",");
-          if (bbox != this.get("_bbox")) {
-            this.set("_bbox", bbox);
-            this.clear();
-          }
           return [extent];
         },
       }),
