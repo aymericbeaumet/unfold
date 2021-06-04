@@ -52,21 +52,27 @@ func main() {
 		c.Data(http.StatusOK, "application/json", data.LandsJSON)
 	})
 
+	r.GET("/data/rivers", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.RiversJSON)
+	})
+
 	if err := r.Run(":9999"); err != nil {
 		log.Fatalln(err)
 	}
 }
 
 type Data struct {
-	Index     *Index
-	LandsJSON []byte
+	Index      *Index
+	LandsJSON  []byte
+	RiversJSON []byte
 }
 
 func loadData(dataDir string) Data {
 	var wg sync.WaitGroup
 	for _, url := range []string{
-		"https://download.geonames.org/export/dump/cities500.zip",
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
+		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
+		"https://download.geonames.org/export/dump/cities500.zip",
 	} {
 		wg.Add(1)
 		go func(url string) {
@@ -154,9 +160,17 @@ func loadData(dataDir string) Data {
 		log.Fatalln(err)
 	}
 
+	// rivers
+
+	rivers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_rivers_lake_centerlines_scale_rank.geojson"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	return Data{
-		Index:     index,
-		LandsJSON: lands,
+		Index:      index,
+		LandsJSON:  lands,
+		RiversJSON: rivers,
 	}
 }
 

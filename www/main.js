@@ -11,41 +11,20 @@ audio.loop = true;
 audio.play();
 
 const landStyle = [
-  new Style({
-    stroke: new Stroke({
-      color: "black",
-      width: 13,
-    }),
-  }),
-  new Style({
-    stroke: new Stroke({
-      color: "white",
-      width: 12,
-    }),
-  }),
-  new Style({
-    stroke: new Stroke({
-      color: "black",
-      width: 8,
-    }),
-  }),
-  new Style({
-    stroke: new Stroke({
-      color: "white",
-      width: 7,
-    }),
-  }),
-  new Style({
-    stroke: new Stroke({
-      color: "black",
-      width: 2,
-    }),
-  }),
+  new Style({ stroke: new Stroke({ color: "black", width: 13 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 12 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 8 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 7 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 2 }) }),
 ];
+
+const riverStyle = new Style({
+  stroke: new Stroke({ color: "black", width: 2 }),
+});
 
 const featureStyle = new Style({
   image: new RegularShape({
-    fill: new Fill({ color: "#000000" }),
+    fill: new Fill({ color: "black" }),
     points: 4,
     radius: 6,
     angle: Math.PI / 4,
@@ -55,7 +34,7 @@ const featureStyle = new Style({
     offsetX: 8,
     offsetY: 1,
     textAlign: "left",
-    fill: new Fill({ color: "#000000" }),
+    fill: new Fill({ color: "black" }),
   }),
 });
 
@@ -68,14 +47,22 @@ const map = new Map({
     zoom: 6,
   }),
   layers: [
-    // Display all lands
+    // Display lands
     new VectorLayer({
       updateWhileInteracting: true,
       style: landStyle,
       source: new VectorSource({
         format: new GeoJSON(),
-        overlaps: false,
         url: "http://localhost:9999/data/lands",
+      }),
+    }),
+    // Display rivers
+    new VectorLayer({
+      updateWhileInteracting: true,
+      style: riverStyle,
+      source: new VectorSource({
+        format: new GeoJSON(),
+        url: "http://localhost:9999/data/rivers",
       }),
     }),
     // Display features in the current bounding box
@@ -88,7 +75,6 @@ const map = new Map({
       },
       source: new VectorSource({
         format: new GeoJSON(),
-        overlaps: false,
         url(extent) {
           const bbox = encodeURIComponent(
             [
