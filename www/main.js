@@ -10,9 +10,38 @@ const audio = new Audio(musicURL);
 audio.loop = true;
 audio.play();
 
-const landStyle = new Style({
-  stroke: new Stroke({ color: "#000000", width: 2 }),
-});
+const landStyle = [
+  new Style({
+    stroke: new Stroke({
+      color: "black",
+      width: 13,
+    }),
+  }),
+  new Style({
+    stroke: new Stroke({
+      color: "white",
+      width: 12,
+    }),
+  }),
+  new Style({
+    stroke: new Stroke({
+      color: "black",
+      width: 8,
+    }),
+  }),
+  new Style({
+    stroke: new Stroke({
+      color: "white",
+      width: 7,
+    }),
+  }),
+  new Style({
+    stroke: new Stroke({
+      color: "black",
+      width: 2,
+    }),
+  }),
+];
 
 const featureStyle = new Style({
   image: new RegularShape({
