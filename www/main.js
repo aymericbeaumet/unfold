@@ -11,44 +11,43 @@ const audio = new Audio(musicURL);
 audio.loop = true;
 audio.play();
 
-const BLACK = "#000000";
-const BLUE = "lightblue"; // also update index.html
-const YELLOW = "#E0C9A6";
+const DETAILS = "#000000";
+const LAND = "#E0C9A6";
+const SEA = "#F0DEC2";
 
-const seaStyle = new Style({
-  fill: new Fill({ color: BLUE }),
-});
+const mapElement = document.getElementById("map");
+mapElement.style.backgroundColor = SEA;
 
 const landStyle = [
-  new Style({ stroke: new Stroke({ color: BLACK, width: 31 }) }),
-  new Style({ stroke: new Stroke({ color: BLUE, width: 30 }) }),
-  new Style({ stroke: new Stroke({ color: BLACK, width: 21 }) }),
-  new Style({ stroke: new Stroke({ color: BLUE, width: 20 }) }),
-  new Style({ stroke: new Stroke({ color: BLACK, width: 15 }) }),
-  new Style({ stroke: new Stroke({ color: BLUE, width: 14 }) }),
-  new Style({ stroke: new Stroke({ color: BLACK, width: 9 }) }),
-  new Style({ stroke: new Stroke({ color: BLUE, width: 8 }) }),
-  new Style({ stroke: new Stroke({ color: BLACK, width: 3 }) }),
-  new Style({ fill: new Fill({ color: YELLOW }) }),
+  new Style({ stroke: new Stroke({ color: DETAILS, width: 31 }) }),
+  new Style({ stroke: new Stroke({ color: SEA, width: 30 }) }),
+  new Style({ stroke: new Stroke({ color: DETAILS, width: 21 }) }),
+  new Style({ stroke: new Stroke({ color: SEA, width: 20 }) }),
+  new Style({ stroke: new Stroke({ color: DETAILS, width: 15 }) }),
+  new Style({ stroke: new Stroke({ color: SEA, width: 14 }) }),
+  new Style({ stroke: new Stroke({ color: DETAILS, width: 9 }) }),
+  new Style({ stroke: new Stroke({ color: SEA, width: 8 }) }),
+  new Style({ stroke: new Stroke({ color: DETAILS, width: 3 }) }),
+  new Style({ fill: new Fill({ color: LAND }) }),
 ];
 
 const riverStyle = new Style({
-  stroke: new Stroke({ color: "black", width: 2 }),
+  stroke: new Stroke({ color: DETAILS, width: 2 }),
 });
 
 const featureStyle = new Style({
   image: new RegularShape({
-    fill: new Fill({ color: "black" }),
+    fill: new Fill({ color: DETAILS }),
     points: 4,
     radius: 6,
     angle: Math.PI / 4,
   }),
   text: new Text({
-    font: 'bold 11px "Luminari"',
+    font: 'bold 13px "Luminari"',
     offsetX: 8,
-    offsetY: 1,
+    offsetY: 2,
     textAlign: "left",
-    fill: new Fill({ color: BLACK }),
+    fill: new Fill({ color: DETAILS }),
   }),
 });
 
@@ -106,7 +105,6 @@ const map = new Map({
   ],
 });
 
-const mapElement = document.getElementById("map");
 const contextMenuElement = document.getElementById("context-menu");
 const coordinatesElement = contextMenuElement.querySelector(
   '[data-action="coordinates"]'
