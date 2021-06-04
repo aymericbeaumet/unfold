@@ -11,11 +11,12 @@ audio.loop = true;
 audio.play();
 
 const landStyle = [
-  new Style({ stroke: new Stroke({ color: "black", width: 13 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 12 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 8 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 7 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 2 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 14 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 13 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 9 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 8 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 3 }) }),
+  new Style({ fill: new Fill({ color: "white" }) }),
 ];
 
 const riverStyle = new Style({
