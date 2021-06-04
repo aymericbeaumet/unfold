@@ -108,7 +108,6 @@ const map = new Map({
             textAlign: "left",
             fill: new Fill({ color: INK }),
             text: feature.get("name"),
-            stroke: new Stroke({ width: 5, color: LAND }),
           }),
         });
       },
