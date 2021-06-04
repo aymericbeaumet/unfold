@@ -1,4 +1,5 @@
 import VectorLayer from "ol/layer/Vector";
+import ImageLayer from "ol/layer/Image";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
@@ -10,17 +11,25 @@ const audio = new Audio(musicURL);
 audio.loop = true;
 audio.play();
 
+const BLACK = "#000000";
+const BLUE = "lightblue"; // also update index.html
+const YELLOW = "#E0C9A6";
+
+const seaStyle = new Style({
+  fill: new Fill({ color: BLUE }),
+});
+
 const landStyle = [
-  new Style({ stroke: new Stroke({ color: "black", width: 31 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 30 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 21 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 20 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 15 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 14 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 9 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 8 }) }),
-  new Style({ stroke: new Stroke({ color: "black", width: 3 }) }),
-  new Style({ fill: new Fill({ color: "white" }) }),
+  new Style({ stroke: new Stroke({ color: BLACK, width: 31 }) }),
+  new Style({ stroke: new Stroke({ color: BLUE, width: 30 }) }),
+  new Style({ stroke: new Stroke({ color: BLACK, width: 21 }) }),
+  new Style({ stroke: new Stroke({ color: BLUE, width: 20 }) }),
+  new Style({ stroke: new Stroke({ color: BLACK, width: 15 }) }),
+  new Style({ stroke: new Stroke({ color: BLUE, width: 14 }) }),
+  new Style({ stroke: new Stroke({ color: BLACK, width: 9 }) }),
+  new Style({ stroke: new Stroke({ color: BLUE, width: 8 }) }),
+  new Style({ stroke: new Stroke({ color: BLACK, width: 3 }) }),
+  new Style({ fill: new Fill({ color: YELLOW }) }),
 ];
 
 const riverStyle = new Style({
@@ -39,7 +48,7 @@ const featureStyle = new Style({
     offsetX: 8,
     offsetY: 1,
     textAlign: "left",
-    fill: new Fill({ color: "black" }),
+    fill: new Fill({ color: BLACK }),
   }),
 });
 
