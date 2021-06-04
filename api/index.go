@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/mmcloughlin/geohash"
@@ -40,9 +39,6 @@ func (index *Index) Find(lon, lat float64) []Indexable {
 }
 
 func (index *Index) FindInBox(minLon, minLat, maxLon, maxLat float64) []Indexable {
-	lon := maxLon - minLon
-	fmt.Println(lon)
-
 	b := geohash.Box{
 		MinLng: minLon,
 		MinLat: minLat,
