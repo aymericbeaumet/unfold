@@ -33,17 +33,25 @@ const map = new Map({
   layers: [
     // Display all lands
     new VectorLayer({
+      updateWhileInteracting: true,
+      style: landStyle,
       source: new VectorSource({
         format: new GeoJSON(),
+        overlaps: false,
         url: "http://localhost:9999/data/lands",
       }),
-      style: landStyle,
     }),
     // Display features in the current bounding box
     new VectorLayer({
       declutter: true,
+      updateWhileInteracting: true,
+      style(feature) {
+        featureStyle.getText().setText(feature.get("name"));
+        return featureStyle;
+      },
       source: new VectorSource({
         format: new GeoJSON(),
+        overlaps: false,
         url(extent) {
           const bbox = encodeURIComponent(
             [
@@ -57,10 +65,6 @@ const map = new Map({
           return [extent];
         },
       }),
-      style(feature) {
-        featureStyle.getText().setText(feature.get("name"));
-        return featureStyle;
-      },
     }),
   ],
 });
