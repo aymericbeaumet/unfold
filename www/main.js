@@ -11,8 +11,12 @@ audio.loop = true;
 audio.play();
 
 const landStyle = [
-  new Style({ stroke: new Stroke({ color: "black", width: 14 }) }),
-  new Style({ stroke: new Stroke({ color: "white", width: 13 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 31 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 30 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 21 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 20 }) }),
+  new Style({ stroke: new Stroke({ color: "black", width: 15 }) }),
+  new Style({ stroke: new Stroke({ color: "white", width: 14 }) }),
   new Style({ stroke: new Stroke({ color: "black", width: 9 }) }),
   new Style({ stroke: new Stroke({ color: "white", width: 8 }) }),
   new Style({ stroke: new Stroke({ color: "black", width: 3 }) }),
