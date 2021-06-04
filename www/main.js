@@ -13,12 +13,13 @@ const featureStyle = new Style({
   image: new RegularShape({
     fill: new Fill({ color: "#000000" }),
     points: 4,
-    radius: 7,
+    radius: 6,
     angle: Math.PI / 4,
   }),
   text: new Text({
-    font: 'bold 11px "Open Sans", "Arial Unicode MS", "sans-serif"',
+    font: 'bold 11px "Luminari"',
     offsetX: 8,
+    offsetY: 1,
     textAlign: "left",
     fill: new Fill({ color: "#000000" }),
   }),
