@@ -48,7 +48,7 @@ func main() {
 		c.Data(http.StatusOK, "application/json", data.LandsJSON)
 	})
 
-	if err := r.Run(":9090"); err != nil {
+	if err := r.Run(":9999"); err != nil {
 		log.Fatalln(err)
 	}
 }

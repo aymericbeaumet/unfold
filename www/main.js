@@ -20,7 +20,7 @@ const map = new Map({
       source: new VectorSource({
         format: new GeoJSON(),
         strategy: loadingstrategy.all,
-        url: "http://localhost:9090/data/lands",
+        url: "http://localhost:9999/data/lands",
       }),
       style: new Style({
         fill: new Fill({ color: "#808000" }),
@@ -38,7 +38,7 @@ const map = new Map({
               ...toLonLat(extent.slice(2, 4)),
             ].join(",")
           );
-          return `http://localhost:9090/data/features?bbox=${bbox}`;
+          return `http://localhost:9999/data/features?bbox=${bbox}`;
         },
       }),
       style: new Style({
@@ -61,7 +61,6 @@ map.on("contextmenu", function (event) {
   event.preventDefault();
 
   const [lon, lat] = toLonLat(event.coordinate);
-
   coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   coordinatesElement.setAttribute("data-lat", lat);
   coordinatesElement.setAttribute("data-lon", lon);
