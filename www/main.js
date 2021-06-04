@@ -4,7 +4,6 @@ import { Fill, Style, Circle } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
-import * as loadingstrategy from "ol/loadingstrategy";
 
 const map = new Map({
   target: document.getElementById("map"),
@@ -19,7 +18,6 @@ const map = new Map({
     new VectorLayer({
       source: new VectorSource({
         format: new GeoJSON(),
-        strategy: loadingstrategy.all,
         url: "http://localhost:9999/data/lands",
       }),
       style: new Style({
@@ -30,7 +28,6 @@ const map = new Map({
     new VectorLayer({
       source: new VectorSource({
         format: new GeoJSON(),
-        strategy: loadingstrategy.bbox,
         url(extent) {
           const bbox = encodeURIComponent(
             [
@@ -39,6 +36,14 @@ const map = new Map({
             ].join(",")
           );
           return `http://localhost:9999/data/features?bbox=${bbox}`;
+        },
+        strategy(extent) {
+          var bbox = extent.join(",");
+          if (bbox != this.get("_bbox")) {
+            this.set("_bbox", bbox);
+            this.clear();
+          }
+          return [extent];
         },
       }),
       style: new Style({

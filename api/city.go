@@ -30,11 +30,11 @@ func (c *City) Coordinates() (float64, float64) {
 }
 
 func (c *City) Score() int {
-	// if the city is a capital, give it a 1B population bonus
+	// if the city is a capital, give it a 1B population ranking bonus
 	if c.IsCapital() {
 		return 1_000_000_000 + c.population
 	}
-	// if the city is a district capital, give it a 100M population bonus
+	// if the city is a district capital, give it a 100M population ranking bonus
 	if c.IsDistrictCapital() {
 		return 100_000_000 + c.population
 	}
