@@ -31,10 +31,14 @@ const map = new Map({
       source: new VectorSource({
         format: new GeoJSON(),
         strategy: loadingstrategy.bbox,
-        url: function (extent, resolution, projection) {
-          return `http://localhost:9090/data/features?box=${encodeURIComponent(
-            toLonLat(extent).join(",")
-          )}`;
+        url(extent) {
+          const bbox = encodeURIComponent(
+            [
+              ...toLonLat(extent.slice(0, 2)),
+              ...toLonLat(extent.slice(2, 4)),
+            ].join(",")
+          );
+          return `http://localhost:9090/data/features?bbox=${bbox}`;
         },
       }),
       style: new Style({
@@ -93,15 +97,15 @@ document.body.addEventListener(
         case "coordinates":
           navigator.clipboard.writeText([lat, lon].join(", "));
           break;
+        case "fullscreen":
+          mapElement.requestFullscreen();
+          break;
         case "googlemaps":
           const latlon = encodeURIComponent([lat, lon].join(","));
           window.open(
             `https://www.google.com/maps?q=${latlon}&ll=${latlon}&z=8`,
             "_blank"
           );
-          break;
-        case "fullscreen":
-          mapElement.requestFullscreen();
           break;
         case "sourcecode":
           window.open("https://github.com/aymericbeaumet/retromap", "_blank");

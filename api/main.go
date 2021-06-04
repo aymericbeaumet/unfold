@@ -27,12 +27,18 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/data/features", func(c *gin.Context) {
-		results := data.Index.FindInBox(parseBox(c.Query("bbox")))
+		bbox := c.Query("bbox")
+		if len(bbox) == 0 {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+
+		results := data.Index.FindInBox(parseBbox(bbox))
 
 		fc := geojson.NewFeatureCollection()
 		for _, result := range results {
-			city := result.(*City)
-			fc.AddFeature(geojson.NewPointFeature([]float64{city.lon, city.lat}))
+			lon, lat := result.Coordinates()
+			fc.AddFeature(geojson.NewPointFeature([]float64{lon, lat}))
 		}
 
 		c.JSON(http.StatusOK, fc)
@@ -101,6 +107,7 @@ func loadData(dataDir string) Data {
 	// cities
 
 	index := NewIndex()
+	defer index.Finalize()
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
@@ -122,7 +129,12 @@ func loadData(dataDir string) Data {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
-			index.Insert(NewCity(records[2], parseFloat(records[5]), parseFloat(records[4])))
+			index.Insert(NewCity(
+				records[2],             // name
+				parseInt(records[14]),  // population
+				parseFloat(records[5]), // longitude
+				parseFloat(records[4]), // latitude
+			))
 		}
 
 		if err := scanner.Err(); err != nil {
@@ -151,11 +163,19 @@ func parseFloat(s string) float64 {
 	return n
 }
 
-func parseBox(s string) (float64, float64, float64, float64) {
+func parseInt(s string) int {
+	n, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		panic(err)
+	}
+	return int(n)
+}
+
+func parseBbox(s string) (float64, float64, float64, float64) {
 	split := strings.Split(s, ",")
 	minLon := parseFloat(split[0])
 	minLat := parseFloat(split[1])
 	maxLon := parseFloat(split[2])
 	maxLat := parseFloat(split[3])
-	return minLon, maxLon, minLat, maxLat
+	return minLon, minLat, maxLon, maxLat
 }
