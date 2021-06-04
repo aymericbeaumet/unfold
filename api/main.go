@@ -38,7 +38,11 @@ func main() {
 		fc := geojson.NewFeatureCollection()
 		for _, result := range results {
 			lon, lat := result.Coordinates()
-			fc.AddFeature(geojson.NewPointFeature([]float64{lon, lat}))
+			f := geojson.NewPointFeature([]float64{lon, lat})
+			for k, v := range result.Properties() {
+				f.Properties[k] = v
+			}
+			fc.AddFeature(f)
 		}
 
 		c.JSON(http.StatusOK, fc)

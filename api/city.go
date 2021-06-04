@@ -29,6 +29,12 @@ func (c *City) Coordinates() (float64, float64) {
 	return c.lon, c.lat
 }
 
+func (c *City) Properties() map[string]interface{} {
+	return map[string]interface{}{
+		"name": c.name,
+	}
+}
+
 func (c *City) Score() int {
 	// if the city is a capital, give it a 1B population ranking bonus
 	if c.IsCapital() {

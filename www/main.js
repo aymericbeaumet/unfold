@@ -1,9 +1,26 @@
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Fill, Style, Circle } from "ol/style";
+import { Fill, Style, Circle, Text } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
+
+const landStyle = new Style({
+  fill: new Fill({ color: "#808000" }),
+});
+
+const featureStyle = new Style({
+  image: new Circle({
+    radius: 5,
+    fill: new Fill({ color: "#000000" }),
+  }),
+  text: new Text({
+    font: 'bold 11px "Open Sans", "Arial Unicode MS", "sans-serif"',
+    offsetX: 8,
+    textAlign: "left",
+    fill: new Fill({ color: "#000000" }),
+  }),
+});
 
 const map = new Map({
   target: document.getElementById("map"),
@@ -20,12 +37,11 @@ const map = new Map({
         format: new GeoJSON(),
         url: "http://localhost:9999/data/lands",
       }),
-      style: new Style({
-        fill: new Fill({ color: "#808000" }),
-      }),
+      style: landStyle,
     }),
     // Display features in the current bounding box
     new VectorLayer({
+      declutter: true,
       source: new VectorSource({
         format: new GeoJSON(),
         url(extent) {
@@ -46,12 +62,10 @@ const map = new Map({
           return [extent];
         },
       }),
-      style: new Style({
-        image: new Circle({
-          radius: 5,
-          fill: new Fill({ color: "#000000" }),
-        }),
-      }),
+      style(feature) {
+        featureStyle.getText().setText(feature.get("name"));
+        return featureStyle;
+      },
     }),
   ],
 });

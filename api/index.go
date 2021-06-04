@@ -13,6 +13,7 @@ type Index struct {
 
 type Indexable interface {
 	Coordinates() (lon float64, lat float64)
+	Properties() map[string]interface{}
 	Score() int
 }
 
