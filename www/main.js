@@ -11,45 +11,12 @@ const audio = new Audio(musicURL);
 audio.loop = true;
 audio.play();
 
-const DETAILS = "#000000";
+const INK = "#000000";
 const LAND = "#E0C9A6";
-const SEA = "#F0DEC2";
+const WATER = "#F0DEC2";
 
 const mapElement = document.getElementById("map");
-mapElement.style.backgroundColor = SEA;
-
-const landStyle = [
-  new Style({ stroke: new Stroke({ color: DETAILS, width: 31 }) }),
-  new Style({ stroke: new Stroke({ color: SEA, width: 30 }) }),
-  new Style({ stroke: new Stroke({ color: DETAILS, width: 21 }) }),
-  new Style({ stroke: new Stroke({ color: SEA, width: 20 }) }),
-  new Style({ stroke: new Stroke({ color: DETAILS, width: 15 }) }),
-  new Style({ stroke: new Stroke({ color: SEA, width: 14 }) }),
-  new Style({ stroke: new Stroke({ color: DETAILS, width: 9 }) }),
-  new Style({ stroke: new Stroke({ color: SEA, width: 8 }) }),
-  new Style({ stroke: new Stroke({ color: DETAILS, width: 3 }) }),
-  new Style({ fill: new Fill({ color: LAND }) }),
-];
-
-const riverStyle = new Style({
-  stroke: new Stroke({ color: DETAILS, width: 2 }),
-});
-
-const featureStyle = new Style({
-  image: new RegularShape({
-    fill: new Fill({ color: DETAILS }),
-    points: 4,
-    radius: 6,
-    angle: Math.PI / 4,
-  }),
-  text: new Text({
-    font: 'bold 13px "Luminari"',
-    offsetX: 8,
-    offsetY: 2,
-    textAlign: "left",
-    fill: new Fill({ color: DETAILS }),
-  }),
-});
+mapElement.style.backgroundColor = WATER;
 
 const map = new Map({
   target: document.getElementById("map"),
@@ -63,28 +30,87 @@ const map = new Map({
     // Display lands
     new VectorLayer({
       updateWhileInteracting: true,
-      style: landStyle,
+      style(_feature, resolution) {
+        const coeff = 2400 / resolution;
+        return [
+          new Style({
+            stroke: new Stroke({ color: INK, width: coeff * 31 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: WATER, width: coeff * 30 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: INK, width: coeff * 21 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: WATER, width: coeff * 20 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: INK, width: coeff * 15 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: WATER, width: coeff * 14 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: INK, width: coeff * 9 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: WATER, width: coeff * 8 }),
+          }),
+          new Style({
+            stroke: new Stroke({ color: INK, width: coeff * 3 }),
+          }),
+          new Style({
+            fill: new Fill({ color: LAND }),
+          }),
+        ];
+      },
       source: new VectorSource({
         format: new GeoJSON(),
         url: "http://localhost:9999/data/lands",
       }),
     }),
+
     // Display rivers
     new VectorLayer({
       updateWhileInteracting: true,
-      style: riverStyle,
+      style(_feature, resolution) {
+        const coeff = 2400 / resolution;
+        return [
+          new Style({ stroke: new Stroke({ color: INK, width: coeff * 2 }) }),
+          new Style({ stroke: new Stroke({ color: WATER, width: coeff }) }),
+          new Style({ stroke: new Stroke({ color: INK, width: 1 }) }),
+        ];
+      },
       source: new VectorSource({
         format: new GeoJSON(),
         url: "http://localhost:9999/data/rivers",
       }),
     }),
+
     // Display features in the current bounding box
     new VectorLayer({
       declutter: true,
       updateWhileInteracting: true,
-      style(feature) {
-        featureStyle.getText().setText(feature.get("name"));
-        return featureStyle;
+      style(feature, resolution) {
+        const coeff = 2400 / resolution;
+        return new Style({
+          image: new RegularShape({
+            fill: new Fill({ color: INK }),
+            points: 4,
+            radius: coeff * 6,
+            angle: Math.PI / 4,
+          }),
+          text: new Text({
+            font: `bold ${coeff * 14}px "Luminari"`,
+            offsetX: coeff * 8,
+            offsetY: coeff * 2,
+            textAlign: "left",
+            fill: new Fill({ color: INK }),
+            text: feature.get("name"),
+            stroke: new Stroke({ width: 5, color: LAND }),
+          }),
+        });
       },
       source: new VectorSource({
         format: new GeoJSON(),
