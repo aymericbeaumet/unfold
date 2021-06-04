@@ -1,18 +1,20 @@
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Fill, Style, Circle, Text } from "ol/style";
+import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
 
 const landStyle = new Style({
-  fill: new Fill({ color: "#808000" }),
+  stroke: new Stroke({ color: "#000000", width: 2 }),
 });
 
 const featureStyle = new Style({
-  image: new Circle({
-    radius: 5,
+  image: new RegularShape({
     fill: new Fill({ color: "#000000" }),
+    points: 4,
+    radius: 7,
+    angle: Math.PI / 4,
   }),
   text: new Text({
     font: 'bold 11px "Open Sans", "Arial Unicode MS", "sans-serif"',

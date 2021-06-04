@@ -19,7 +19,7 @@ type Indexable interface {
 
 func NewIndex() *Index {
 	return &Index{
-		limit:     10,
+		limit:     8,
 		byGeohash: map[uint64][]Indexable{},
 	}
 }
