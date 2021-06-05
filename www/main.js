@@ -1,9 +1,9 @@
-import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
+import VectorImageLayer from "ol/layer/VectorImage";
 
 /* Constants */
 
@@ -76,8 +76,7 @@ function getLandStyle(scale = 1) {
   ];
 }
 
-const landLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const landLayer = new VectorImageLayer({
   style: getLandStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -97,8 +96,7 @@ function getRiverStyle(scale = 1) {
   ];
 }
 
-const riverLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const riverLayer = new VectorImageLayer({
   style: getRiverStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -133,7 +131,7 @@ function getFeatureStyle(scale = 1) {
   };
 }
 
-const featureLayer = new VectorLayer({
+const featureLayer = new VectorImageLayer({
   declutter: true,
   updateWhileInteracting: true,
   style: getFeatureStyle(),
