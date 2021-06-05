@@ -29,7 +29,7 @@ const mapViewInitialResolution = mapView.getResolution();
 
 mapElement.style.backgroundColor = COLOR_WATER;
 
-/* Land layout */
+/* Land layer */
 
 function getLandStyle(scale = 1) {
   return [
@@ -66,7 +66,7 @@ function getLandStyle(scale = 1) {
   ];
 }
 
-const landLayout = new VectorLayer({
+const landLayer = new VectorLayer({
   updateWhileInteracting: true,
   style: getLandStyle(),
   source: new VectorSource({
@@ -75,9 +75,9 @@ const landLayout = new VectorLayer({
   }),
 });
 
-map.addLayer(landLayout);
+map.addLayer(landLayer);
 
-/* River layout */
+/* River layer */
 
 function getRiverStyle(scale = 1) {
   return [
@@ -87,7 +87,7 @@ function getRiverStyle(scale = 1) {
   ];
 }
 
-const riverLayout = new VectorLayer({
+const riverLayer = new VectorLayer({
   updateWhileInteracting: true,
   style: getRiverStyle(),
   source: new VectorSource({
@@ -96,9 +96,9 @@ const riverLayout = new VectorLayer({
   }),
 });
 
-map.addLayer(riverLayout);
+map.addLayer(riverLayer);
 
-/* Feature layout */
+/* Feature layer */
 
 function getFeatureStyle(scale = 1) {
   const style = new Style({
@@ -123,7 +123,7 @@ function getFeatureStyle(scale = 1) {
   };
 }
 
-const featureLayout = new VectorLayer({
+const featureLayer = new VectorLayer({
   declutter: true,
   updateWhileInteracting: true,
   style: getFeatureStyle(),
@@ -141,7 +141,7 @@ const featureLayout = new VectorLayer({
   }),
 });
 
-map.addLayer(featureLayout);
+map.addLayer(featureLayer);
 
 /* Context menu */
 
@@ -215,7 +215,7 @@ document.body.addEventListener(
 
 mapView.on("change:resolution", function () {
   const scale = mapViewInitialResolution / mapView.getResolution();
-  landLayout.setStyle(getLandStyle(scale));
-  riverLayout.setStyle(getRiverStyle(scale));
-  featureLayout.setStyle(getFeatureStyle(scale));
+  landLayer.setStyle(getLandStyle(scale));
+  riverLayer.setStyle(getRiverStyle(scale));
+  featureLayer.setStyle(getFeatureStyle(scale));
 });
