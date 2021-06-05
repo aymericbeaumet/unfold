@@ -4,19 +4,12 @@ import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
-import musicURL from "url:./static/assets/alexander-nakarada-medieval-loop-one.mp3";
 
 /* Constants */
 
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
-
-/* Audio */
-
-const audio = new Audio(musicURL);
-audio.loop = true;
-audio.play();
 
 /* Map */
 

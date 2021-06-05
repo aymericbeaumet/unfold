@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	geojson "github.com/paulmach/go.geojson"
 )
@@ -24,9 +25,11 @@ var httpClient = http.Client{
 func main() {
 	data := loadData("./data/")
 
-	r := gin.Default()
+	router := gin.Default()
 
-	r.GET("/data/features", func(c *gin.Context) {
+	router.Use(cors.Default())
+
+	router.GET("/data/features", func(c *gin.Context) {
 		bbox := c.Query("bbox")
 		if len(bbox) == 0 {
 			c.AbortWithStatus(http.StatusBadRequest)
@@ -48,15 +51,15 @@ func main() {
 		c.JSON(http.StatusOK, fc)
 	})
 
-	r.GET("/data/lands", func(c *gin.Context) {
+	router.GET("/data/lands", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/json", data.LandsJSON)
 	})
 
-	r.GET("/data/rivers", func(c *gin.Context) {
+	router.GET("/data/rivers", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/json", data.RiversJSON)
 	})
 
-	if err := r.Run(":9999"); err != nil {
+	if err := router.Run(":9999"); err != nil {
 		log.Fatalln(err)
 	}
 }
