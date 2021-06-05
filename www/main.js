@@ -32,41 +32,40 @@ const map = new Map({
   layers: [],
 });
 const mapView = map.getView();
-const mapBaseResolution = mapView.getResolution();
+const mapViewInitialResolution = mapView.getResolution();
 
 mapElement.style.backgroundColor = COLOR_WATER;
 
 /* Land layout */
 
-function getLandStyle() {
-  const coeff = mapBaseResolution / mapView.getResolution();
+function getLandStyle(scale = 1) {
   return [
     new Style({
-      stroke: new Stroke({ color: COLOR_INK, width: coeff * 31 }),
+      stroke: new Stroke({ color: COLOR_INK, width: scale * 31 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_WATER, width: coeff * 30 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: scale * 30 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_INK, width: coeff * 21 }),
+      stroke: new Stroke({ color: COLOR_INK, width: scale * 21 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_WATER, width: coeff * 20 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: scale * 20 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_INK, width: coeff * 15 }),
+      stroke: new Stroke({ color: COLOR_INK, width: scale * 15 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_WATER, width: coeff * 14 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: scale * 14 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_INK, width: coeff * 9 }),
+      stroke: new Stroke({ color: COLOR_INK, width: scale * 9 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_WATER, width: coeff * 8 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: scale * 8 }),
     }),
     new Style({
-      stroke: new Stroke({ color: COLOR_INK, width: coeff * 3 }),
+      stroke: new Stroke({ color: COLOR_INK, width: scale * 3 }),
     }),
     new Style({
       fill: new Fill({ color: COLOR_LAND }),
@@ -87,11 +86,10 @@ map.addLayer(landLayout);
 
 /* River layout */
 
-function getRiverStyle() {
-  const coeff = mapBaseResolution / mapView.getResolution();
+function getRiverStyle(scale = 1) {
   return [
-    new Style({ stroke: new Stroke({ color: COLOR_INK, width: coeff * 2 }) }),
-    new Style({ stroke: new Stroke({ color: COLOR_WATER, width: coeff }) }),
+    new Style({ stroke: new Stroke({ color: COLOR_INK, width: scale * 2 }) }),
+    new Style({ stroke: new Stroke({ color: COLOR_WATER, width: scale }) }),
     new Style({ stroke: new Stroke({ color: COLOR_INK, width: 1 }) }),
   ];
 }
@@ -109,19 +107,18 @@ map.addLayer(riverLayout);
 
 /* Feature layout */
 
-function getFeatureStyle() {
-  const coeff = mapBaseResolution / mapView.getResolution();
+function getFeatureStyle(scale = 1) {
   const style = new Style({
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
       points: 4,
-      radius: coeff * 6,
+      radius: scale * 6,
       angle: Math.PI / 4,
     }),
     text: new Text({
-      font: `bold ${coeff * 14}px "Luminari"`,
-      offsetX: coeff * 8,
-      offsetY: coeff * 2,
+      font: `bold ${scale * 14}px "Luminari"`,
+      offsetX: scale * 8,
+      offsetY: scale * 2,
       textAlign: "left",
       fill: new Fill({ color: COLOR_INK }),
       stroke: new Stroke({ width: 2, color: COLOR_LAND }),
@@ -224,7 +221,8 @@ document.body.addEventListener(
 /* Resolution change */
 
 mapView.on("change:resolution", function () {
-  landLayout.setStyle(getLandStyle());
-  riverLayout.setStyle(getRiverStyle());
-  featureLayout.setStyle(getFeatureStyle());
+  const scale = mapViewInitialResolution / mapView.getResolution();
+  landLayout.setStyle(getLandStyle(scale));
+  riverLayout.setStyle(getRiverStyle(scale));
+  featureLayout.setStyle(getFeatureStyle(scale));
 });
