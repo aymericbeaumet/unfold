@@ -52,11 +52,15 @@ func main() {
 	})
 
 	router.GET("/data/lands", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.LandsJSON)
+		c.Data(http.StatusOK, "application/json", data.LandsGEOJSON)
+	})
+
+	router.GET("/data/peaks", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.PeaksGEOJSON)
 	})
 
 	router.GET("/data/rivers", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.RiversJSON)
+		c.Data(http.StatusOK, "application/json", data.RiversGEOJSON)
 	})
 
 	if err := router.Run(":9999"); err != nil {
@@ -65,9 +69,10 @@ func main() {
 }
 
 type Data struct {
-	Index      *Index
-	LandsJSON  []byte
-	RiversJSON []byte
+	Index         *Index
+	LandsGEOJSON  []byte
+	RiversGEOJSON []byte
+	PeaksGEOJSON  []byte
 }
 
 func loadData(dataDir string) Data {
@@ -76,6 +81,7 @@ func loadData(dataDir string) Data {
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
 		"https://download.geonames.org/export/dump/cities500.zip",
+		"https://raw.githubusercontent.com/blackmad/neighborhoods/master/peaks.geojson",
 	} {
 		wg.Add(1)
 		go func(url string) {
@@ -163,6 +169,13 @@ func loadData(dataDir string) Data {
 		log.Fatalln(err)
 	}
 
+	// peaks
+
+	peaks, err := os.ReadFile(filepath.Join(dataDir, "peaks.geojson"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	// rivers
 
 	rivers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_rivers_lake_centerlines_scale_rank.geojson"))
@@ -171,9 +184,10 @@ func loadData(dataDir string) Data {
 	}
 
 	return Data{
-		Index:      index,
-		LandsJSON:  lands,
-		RiversJSON: rivers,
+		Index:         index,
+		LandsGEOJSON:  lands,
+		PeaksGEOJSON:  peaks,
+		RiversGEOJSON: rivers,
 	}
 }
 

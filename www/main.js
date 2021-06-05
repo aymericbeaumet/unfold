@@ -1,9 +1,11 @@
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
+import { Fill, Style, RegularShape, Text, Stroke, Icon } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
+
+import peakSVG from "url:./static/assets/mountains-mountain-svgrepo-com.svg";
 
 /* Constants */
 
@@ -86,6 +88,25 @@ const landLayer = new VectorLayer({
 });
 
 map.addLayer(landLayer);
+
+/* Peak layer */
+
+console.log(peakSVG);
+
+function getPeakStyle(scale = 1) {
+  return new Style({ image: new Icon({ src: peakSVG, scale }) });
+}
+
+const peakLayer = new VectorLayer({
+  updateWhileInteracting: true,
+  style: getPeakStyle(),
+  source: new VectorSource({
+    format: new GeoJSON(),
+    url: "http://localhost:9999/data/peaks",
+  }),
+});
+
+map.addLayer(peakLayer);
 
 /* River layer */
 
@@ -225,7 +246,8 @@ document.body.addEventListener(
 
 mapView.on("change:resolution", function () {
   const scale = mapViewInitialResolution / mapView.getResolution();
-  landLayer.setStyle(getLandStyle(scale));
-  riverLayer.setStyle(getRiverStyle(scale));
   featureLayer.setStyle(getFeatureStyle(scale));
+  landLayer.setStyle(getLandStyle(scale));
+  peakLayer.setStyle(getPeakStyle(scale));
+  riverLayer.setStyle(getRiverStyle(scale));
 });
