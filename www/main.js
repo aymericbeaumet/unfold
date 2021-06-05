@@ -34,33 +34,43 @@ mapElement.style.backgroundColor = COLOR_WATER;
 function getLandStyle(scale = 1) {
   return [
     new Style({
+      zIndex: 1,
       stroke: new Stroke({ color: COLOR_INK, width: scale * 31 }),
     }),
     new Style({
+      zIndex: 2,
       stroke: new Stroke({ color: COLOR_WATER, width: scale * 30 }),
     }),
     new Style({
+      zIndex: 3,
       stroke: new Stroke({ color: COLOR_INK, width: scale * 21 }),
     }),
     new Style({
+      zIndex: 4,
       stroke: new Stroke({ color: COLOR_WATER, width: scale * 20 }),
     }),
     new Style({
+      zIndex: 5,
       stroke: new Stroke({ color: COLOR_INK, width: scale * 15 }),
     }),
     new Style({
+      zIndex: 6,
       stroke: new Stroke({ color: COLOR_WATER, width: scale * 14 }),
     }),
     new Style({
+      zIndex: 7,
       stroke: new Stroke({ color: COLOR_INK, width: scale * 9 }),
     }),
     new Style({
+      zIndex: 8,
       stroke: new Stroke({ color: COLOR_WATER, width: scale * 8 }),
     }),
     new Style({
+      zIndex: 9,
       stroke: new Stroke({ color: COLOR_INK, width: scale * 3 }),
     }),
     new Style({
+      zIndex: 10,
       fill: new Fill({ color: COLOR_LAND }),
     }),
   ];
