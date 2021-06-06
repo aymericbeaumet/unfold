@@ -1,4 +1,5 @@
 import VectorLayer from "ol/layer/Vector";
+import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke, Icon } from "ol/style";
 import { GeoJSON } from "ol/format";
@@ -173,6 +174,24 @@ const featureLayer = new VectorLayer({
 });
 
 map.addLayer(featureLayer);
+
+/* Graticule layer */
+
+const graticuleLayer = new GraticuleLayer({
+  strokeStyle: new Stroke({
+    color: COLOR_INK,
+  }),
+  intervals: [10],
+  showLabels: true,
+  lonLabelFormatter(lon) {
+    return lon < 0 ? lon + 360 : lon;
+  },
+  latLabelFormatter(lat) {
+    return Math.abs(lat);
+  },
+});
+
+map.addLayer(graticuleLayer);
 
 /* Context menu */
 
