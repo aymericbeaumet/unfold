@@ -141,6 +141,7 @@ function getFeatureStyle(scale = 1) {
       points: 4,
       radius: scale * 6,
       angle: Math.PI / 4,
+      stroke: new Stroke({ color: COLOR_LAND, width: 1 }),
     }),
     text: new Text({
       font: `bold ${scale * 14}px "Luminari"`,
@@ -148,7 +149,7 @@ function getFeatureStyle(scale = 1) {
       offsetY: scale * 2,
       textAlign: "left",
       fill: new Fill({ color: COLOR_INK }),
-      stroke: new Stroke({ width: 2, color: COLOR_LAND }),
+      stroke: new Stroke({ color: COLOR_LAND, width: 2 }),
     }),
   });
   return function (feature) {
