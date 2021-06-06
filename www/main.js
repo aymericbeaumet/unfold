@@ -181,6 +181,7 @@ const graticuleLayer = new GraticuleLayer({
   strokeStyle: new Stroke({
     color: COLOR_INK,
   }),
+  maxZoom: 7,
   intervals: [10],
   showLabels: true,
   lonLabelFormatter(lon) {
