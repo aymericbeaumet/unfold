@@ -116,9 +116,7 @@ map.addLayer(peakLayer);
 
 function getRiverStyle(scale = 1) {
   return [
-    new Style({ stroke: new Stroke({ color: COLOR_INK, width: scale * 2 }) }),
-    new Style({ stroke: new Stroke({ color: COLOR_WATER, width: scale }) }),
-    new Style({ stroke: new Stroke({ color: COLOR_INK, width: 1 }) }),
+    new Style({ stroke: new Stroke({ color: COLOR_INK, width: scale }) }),
   ];
 }
 
