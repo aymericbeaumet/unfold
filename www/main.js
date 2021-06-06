@@ -1,4 +1,3 @@
-import VectorLayer from "ol/layer/Vector";
 import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
@@ -158,9 +157,9 @@ function getFeatureStyle(scale = 1) {
   };
 }
 
-const featureLayer = new VectorLayer({
+const featureLayer = new VectorImageLayer({
   declutter: true,
-  updateWhileInteracting: true,
+  imageRatio: IMAGE_RATIO,
   style: getFeatureStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
