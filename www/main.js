@@ -1,4 +1,5 @@
 import VectorLayer from "ol/layer/Vector";
+import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke, Icon } from "ol/style";
@@ -13,6 +14,8 @@ import peakSVG from "url:./static/assets/mountains-mountain-svgrepo-com.svg";
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
+
+const IMAGE_RATIO = 2;
 
 /* Map */
 
@@ -79,9 +82,9 @@ function getLandStyle(scale = 1) {
   ];
 }
 
-const landLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const landLayer = new VectorImageLayer({
   style: getLandStyle(),
+  imageRatio: IMAGE_RATIO,
   source: new VectorSource({
     format: new GeoJSON(),
     url: "http://localhost:9999/data/lands",
@@ -98,8 +101,8 @@ function getPeakStyle(scale = 1) {
   return new Style({ image: new Icon({ src: peakSVG, scale }) });
 }
 
-const peakLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const peakLayer = new VectorImageLayer({
+  imageRatio: IMAGE_RATIO,
   style: getPeakStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -119,8 +122,8 @@ function getRiverStyle(scale = 1) {
   ];
 }
 
-const riverLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const riverLayer = new VectorImageLayer({
+  imageRatio: IMAGE_RATIO,
   style: getRiverStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
