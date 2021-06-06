@@ -10,6 +10,7 @@ import peakSVG from "url:./static/assets/mountains-mountain-svgrepo-com.svg";
 
 /* Constants */
 
+const COLOR_GRATICULE = "#5E5E5E";
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
@@ -181,9 +182,7 @@ map.addLayer(featureLayer);
 /* Graticule layer */
 
 const graticuleLayer = new GraticuleLayer({
-  strokeStyle: new Stroke({
-    color: COLOR_INK,
-  }),
+  strokeStyle: new Stroke({ color: COLOR_GRATICULE }),
   maxZoom: 5,
   intervals: [10],
   showLabels: true,
