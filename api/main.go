@@ -29,20 +29,20 @@ func main() {
 
 	router.Use(cors.Default())
 
-	router.GET("/data/features", func(c *gin.Context) {
+	router.GET("/data/cities", func(c *gin.Context) {
 		bbox := c.Query("bbox")
 		if len(bbox) == 0 {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 
-		results := data.Index.FindInBox(parseBbox(bbox))
-
 		fc := geojson.NewFeatureCollection()
-		for _, result := range results {
-			lon, lat := result.Coordinates()
+
+		cities := data.CitiesIndex.FindInBox(parseBbox(bbox))
+		for _, city := range cities {
+			lon, lat := city.Coordinates()
 			f := geojson.NewPointFeature([]float64{lon, lat})
-			for k, v := range result.Properties() {
+			for k, v := range city.Properties() {
 				f.Properties[k] = v
 			}
 			fc.AddFeature(f)
@@ -51,12 +51,20 @@ func main() {
 		c.JSON(http.StatusOK, fc)
 	})
 
+	router.GET("/data/glaciers", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.GlaciersGEOJSON)
+	})
+
+	router.GET("/data/lakes", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.LakesGEOJSON)
+	})
+
 	router.GET("/data/lands", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/json", data.LandsGEOJSON)
 	})
 
-	router.GET("/data/peaks", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/json", data.PeaksGEOJSON)
+	router.GET("/data/marinepits", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/json", data.MarinePitsGEOJSON)
 	})
 
 	router.GET("/data/rivers", func(c *gin.Context) {
@@ -69,19 +77,23 @@ func main() {
 }
 
 type Data struct {
-	Index         *Index
-	LandsGEOJSON  []byte
-	RiversGEOJSON []byte
-	PeaksGEOJSON  []byte
+	CitiesIndex       *Index
+	GlaciersGEOJSON   []byte
+	LandsGEOJSON      []byte
+	LakesGEOJSON      []byte
+	MarinePitsGEOJSON []byte
+	RiversGEOJSON     []byte
 }
 
 func loadData(dataDir string) Data {
 	var wg sync.WaitGroup
 	for _, url := range []string{
+		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
+		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson",
+		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson",
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
 		"https://download.geonames.org/export/dump/cities500.zip",
-		"https://raw.githubusercontent.com/blackmad/neighborhoods/master/peaks.geojson",
 	} {
 		wg.Add(1)
 		go func(url string) {
@@ -125,8 +137,8 @@ func loadData(dataDir string) Data {
 
 	// cities
 
-	index := NewIndex()
-	defer index.Finalize()
+	citiesIndex := NewIndex()
+	defer citiesIndex.Finalize()
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
@@ -148,7 +160,7 @@ func loadData(dataDir string) Data {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
-			index.Insert(NewCity(
+			citiesIndex.Insert(NewCity(
 				records[2],             // name
 				records[7],             // feature code (capital, district capital, etc)
 				parseInt(records[14]),  // population
@@ -162,32 +174,43 @@ func loadData(dataDir string) Data {
 		}
 	}
 
-	// lands
+	// glaciers
+	glaciers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_glaciated_areas.geojson"))
+	if err != nil {
+		log.Fatalln(err)
+	}
 
+	// lakes
+	lakes, err := os.ReadFile(filepath.Join(dataDir, "ne_10m_lakes.geojson"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// lands
 	lands, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_land.geojson"))
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	// peaks
-
-	peaks, err := os.ReadFile(filepath.Join(dataDir, "peaks.geojson"))
+	// marine pits
+	marinepits, err := os.ReadFile(filepath.Join(dataDir, "ne_10m_bathymetry_E_6000.geojson"))
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	// rivers
-
 	rivers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_rivers_lake_centerlines_scale_rank.geojson"))
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	return Data{
-		Index:         index,
-		LandsGEOJSON:  lands,
-		PeaksGEOJSON:  peaks,
-		RiversGEOJSON: rivers,
+		CitiesIndex:       citiesIndex,
+		GlaciersGEOJSON:   glaciers,
+		LakesGEOJSON:      lakes,
+		LandsGEOJSON:      lands,
+		MarinePitsGEOJSON: marinepits,
+		RiversGEOJSON:     rivers,
 	}
 }
 

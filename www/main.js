@@ -1,12 +1,10 @@
 import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
-import { Fill, Style, RegularShape, Text, Stroke, Icon } from "ol/style";
+import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
-
-import peakSVG from "url:./static/assets/mountains-mountain-svgrepo-com.svg";
 
 /* Constants */
 
@@ -93,31 +91,31 @@ const landLayer = new VectorImageLayer({
 
 map.addLayer(landLayer);
 
-/* Peak layer */
+/* Glacier layer */
 
-console.log(peakSVG);
-
-function getPeakStyle(scale = 1) {
-  return new Style({ image: new Icon({ src: peakSVG, scale }) });
+function getGlacierStyle(scale = 1) {
+  return new Style({
+    fill: new Fill({ color: "darkgray" }),
+  });
 }
 
-const peakLayer = new VectorImageLayer({
+const glacierLayer = new VectorImageLayer({
   imageRatio: IMAGE_RATIO,
-  style: getPeakStyle(),
+  style: getGlacierStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: "http://localhost:9999/data/peaks",
+    url: "http://localhost:9999/data/glaciers",
   }),
 });
 
-map.addLayer(peakLayer);
+map.addLayer(glacierLayer);
 
 /* River layer */
 
 function getRiverStyle(scale = 1) {
-  return [
-    new Style({ stroke: new Stroke({ color: COLOR_INK, width: scale }) }),
-  ];
+  return new Style({
+    stroke: new Stroke({ color: COLOR_INK, width: scale }),
+  });
 }
 
 const riverLayer = new VectorImageLayer({
@@ -131,9 +129,48 @@ const riverLayer = new VectorImageLayer({
 
 map.addLayer(riverLayer);
 
-/* Feature layer */
+/* Lake layer */
 
-function getFeatureStyle(scale = 1) {
+function getLakeStyle(scale = 1) {
+  return new Style({
+    fill: new Fill({ color: COLOR_WATER }),
+    stroke: new Stroke({ color: COLOR_INK, width: scale }),
+  });
+}
+
+const lakeLayer = new VectorImageLayer({
+  imageRatio: IMAGE_RATIO,
+  style: getLakeStyle(),
+  source: new VectorSource({
+    format: new GeoJSON(),
+    url: "http://localhost:9999/data/lakes",
+  }),
+});
+
+map.addLayer(lakeLayer);
+
+/* Marine pit layer */
+
+function getMarinepitStyle(scale = 1) {
+  return new Style({
+    fill: new Fill({ color: "darkblue" }),
+  });
+}
+
+const marinepitLayer = new VectorImageLayer({
+  imageRatio: IMAGE_RATIO,
+  style: getMarinepitStyle(),
+  source: new VectorSource({
+    format: new GeoJSON(),
+    url: "http://localhost:9999/data/marinepits",
+  }),
+});
+
+map.addLayer(marinepitLayer);
+
+/* City layer */
+
+function getCityStyle(scale = 1) {
   const style = new Style({
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
@@ -157,17 +194,17 @@ function getFeatureStyle(scale = 1) {
   };
 }
 
-const featureLayer = new VectorImageLayer({
+const cityLayer = new VectorImageLayer({
   declutter: true,
   imageRatio: IMAGE_RATIO,
-  style: getFeatureStyle(),
+  style: getCityStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
     url(extent) {
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `http://localhost:9999/data/features?bbox=${bbox}`;
+      return `http://localhost:9999/data/cities?bbox=${bbox}`;
     },
     strategy(extent) {
       return [extent];
@@ -175,7 +212,7 @@ const featureLayer = new VectorImageLayer({
   }),
 });
 
-map.addLayer(featureLayer);
+map.addLayer(cityLayer);
 
 /* Graticule layer */
 
@@ -266,8 +303,10 @@ document.body.addEventListener(
 
 mapView.on("change:resolution", function () {
   const scale = mapViewInitialResolution / mapView.getResolution();
-  featureLayer.setStyle(getFeatureStyle(scale));
+  cityLayer.setStyle(getCityStyle(scale));
+  glacierLayer.setStyle(getGlacierStyle(scale));
+  lakeLayer.setStyle(getLakeStyle(scale));
   landLayer.setStyle(getLandStyle(scale));
-  peakLayer.setStyle(getPeakStyle(scale));
+  marinepitLayer.setStyle(getMarinepitStyle(scale));
   riverLayer.setStyle(getRiverStyle(scale));
 });
