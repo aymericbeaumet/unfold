@@ -28,8 +28,6 @@ const map = new Map({
   }),
   layers: [],
 });
-const mapView = map.getView();
-const mapViewInitialResolution = mapView.getResolution();
 
 mapElement.style.backgroundColor = COLOR_WATER;
 
@@ -168,21 +166,21 @@ const marinepitLayer = new VectorImageLayer({
 
 map.addLayer(marinepitLayer);
 
-/* City layer */
+/* Features layer */
 
-function getCityStyle(scale = 1) {
+function featuresStyle() {
   const style = new Style({
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
       points: 4,
-      radius: scale * 6,
+      radius: 6,
       angle: Math.PI / 4,
       stroke: new Stroke({ color: COLOR_LAND, width: 1 }),
     }),
     text: new Text({
-      font: `bold ${scale * 14}px "Luminari"`,
-      offsetX: scale * 8,
-      offsetY: scale * 2,
+      font: 'bold 14px "Luminari"',
+      offsetX: 8,
+      offsetY: 2,
       textAlign: "left",
       fill: new Fill({ color: COLOR_INK }),
       stroke: new Stroke({ color: COLOR_LAND, width: 2 }),
@@ -194,25 +192,33 @@ function getCityStyle(scale = 1) {
   };
 }
 
-const cityLayer = new VectorImageLayer({
+let _resolution;
+const featuresLayer = new VectorImageLayer({
   declutter: true,
-  imageRatio: IMAGE_RATIO,
-  style: getCityStyle(),
+  style: featuresStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url(extent) {
+    url: function (extent, resolution) {
+      _resolution = resolution;
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `http://localhost:9999/data/cities?bbox=${bbox}`;
+      return `http://localhost:9999/data?bbox=${bbox}`;
     },
-    strategy(extent) {
+    strategy: function (extent, resolution) {
+      if (_resolution) {
+        if (_resolution > resolution) {
+          this.loadedExtentsRtree_.clear();
+        } else if (_resolution < resolution) {
+          this.clear();
+        }
+      }
       return [extent];
     },
   }),
 });
 
-map.addLayer(cityLayer);
+map.addLayer(featuresLayer);
 
 /* Graticule layer */
 
@@ -298,15 +304,3 @@ document.body.addEventListener(
   },
   true
 );
-
-/* Resolution change */
-
-mapView.on("change:resolution", function () {
-  const scale = mapViewInitialResolution / mapView.getResolution();
-  cityLayer.setStyle(getCityStyle(scale));
-  glacierLayer.setStyle(getGlacierStyle(scale));
-  lakeLayer.setStyle(getLakeStyle(scale));
-  landLayer.setStyle(getLandStyle(scale));
-  marinepitLayer.setStyle(getMarinepitStyle(scale));
-  riverLayer.setStyle(getRiverStyle(scale));
-});
