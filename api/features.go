@@ -4,6 +4,8 @@ import (
 	"sort"
 
 	"github.com/mmcloughlin/geohash"
+	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geojson"
 )
 
 type Feature interface {
@@ -13,21 +15,17 @@ type Feature interface {
 }
 
 type FeaturesIndex struct {
-	minPrecisionBits uint
-	maxPrecisionBits uint
-
-	maxResults int
-
+	minPrecisionBits  uint
+	maxPrecisionBits  uint
+	maxResults        int
 	featuresByGeohash map[uint64][]Feature
 }
 
 func NewFeaturesIndex(minPrecisionBits, maxPrecisionBits uint) *FeaturesIndex {
 	return &FeaturesIndex{
-		minPrecisionBits: minPrecisionBits,
-		maxPrecisionBits: maxPrecisionBits,
-
-		maxResults: 100,
-
+		minPrecisionBits:  minPrecisionBits,
+		maxPrecisionBits:  maxPrecisionBits,
+		maxResults:        100,
 		featuresByGeohash: map[uint64][]Feature{},
 	}
 }
@@ -50,7 +48,7 @@ func (feature *FeaturesIndex) Finalize() {
 	}
 }
 
-func (feature *FeaturesIndex) Find(bbox geohash.Box, lim int) []Feature {
+func (feature *FeaturesIndex) Find(bbox geohash.Box, lim int) *geojson.FeatureCollection {
 	hash := geohash.EncodeInt(bbox.Center())
 
 	for bits := feature.maxPrecisionBits; bits >= feature.minPrecisionBits; bits-- {
@@ -83,7 +81,7 @@ func (feature *FeaturesIndex) Find(bbox geohash.Box, lim int) []Feature {
 	return nil
 }
 
-func (feature *FeaturesIndex) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Feature {
+func (feature *FeaturesIndex) find(bbox geohash.Box, lim int, hash uint64, bits uint) *geojson.FeatureCollection {
 	if lim > feature.maxResults {
 		lim = feature.maxResults
 	}
@@ -95,9 +93,9 @@ func (feature *FeaturesIndex) find(bbox geohash.Box, lim int, hash uint64, bits 
 		featuresByGeohash[h] = feature.featuresByGeohash[h]
 	}
 
+	out := geojson.NewFeatureCollection()
 	// leverage the fact these lists are sorted to pick 1 by 1 until out is full,
 	// or the lists are empty
-	out := make([]Feature, 0, lim)
 	for i := 0; len(featuresByGeohash) > 0; i++ {
 		for hash, features := range featuresByGeohash {
 			if i >= len(features) {
@@ -107,8 +105,12 @@ func (feature *FeaturesIndex) find(bbox geohash.Box, lim int, hash uint64, bits 
 			feature := features[i]
 			lon, lat := feature.Coordinates()
 			if bbox.Contains(lat, lon) {
-				out = append(out, feature)
-				if len(out) >= lim {
+				f := geojson.NewFeature(orb.Point{lon, lat})
+				for k, v := range feature.Properties() {
+					f.Properties[k] = v
+				}
+				out.Append(f)
+				if len(out.Features) >= lim {
 					return out
 				}
 			}

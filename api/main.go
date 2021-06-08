@@ -10,7 +10,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/mmcloughlin/geohash"
-	geojson "github.com/paulmach/go.geojson"
 )
 
 var httpClient = http.Client{
@@ -18,25 +17,21 @@ var httpClient = http.Client{
 }
 
 func main() {
-	index := loadData("./data")
+	backgroundIndex, featuresIndex := loadData("./data")
 
 	router := gin.Default()
 	router.Use(cors.Default())
 
-	router.GET("/data", func(c *gin.Context) {
+	router.GET("/background", func(c *gin.Context) {
+		bbox := parseBbox(c.Query("bbox"))
+		fc := backgroundIndex.Find(bbox)
+		c.JSON(http.StatusOK, fc)
+	})
+
+	router.GET("/features", func(c *gin.Context) {
 		bbox := parseBbox(c.Query("bbox"))
 		lim := parseInt(c.DefaultQuery("lim", "100"))
-
-		fc := geojson.NewFeatureCollection()
-		for _, feature := range index.Find(bbox, lim) {
-			lon, lat := feature.Coordinates()
-			f := geojson.NewPointFeature([]float64{lon, lat})
-			for k, v := range feature.Properties() {
-				f.Properties[k] = v
-			}
-			fc.AddFeature(f)
-		}
-
+		fc := featuresIndex.Find(bbox, lim)
 		c.JSON(http.StatusOK, fc)
 	})
 

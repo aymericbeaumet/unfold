@@ -121,7 +121,15 @@ const riverLayer = new VectorImageLayer({
   style: getRiverStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: "http://localhost:9999/data/rivers",
+    url(extent) {
+      const min = toLonLat(extent.slice(0, 2));
+      const max = toLonLat(extent.slice(2, 4));
+      const bbox = encodeURIComponent([...min, ...max].join(","));
+      return `http://localhost:9999/background?bbox=${bbox}`;
+    },
+    strategy(extent) {
+      return [extent];
+    },
   }),
 });
 
@@ -198,14 +206,14 @@ const featuresLayer = new VectorImageLayer({
   style: featuresStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: function (extent, resolution) {
+    url(extent, resolution) {
       _resolution = resolution;
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `http://localhost:9999/data?bbox=${bbox}`;
+      return `http://localhost:9999/features?bbox=${bbox}`;
     },
-    strategy: function (extent, resolution) {
+    strategy(extent, resolution) {
       if (_resolution) {
         if (_resolution > resolution) {
           this.loadedExtentsRtree_.clear();

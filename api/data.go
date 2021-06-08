@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-func loadData(dataDir string) *FeaturesIndex {
+func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 	var wg sync.WaitGroup
 	for _, url := range []string{
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
@@ -30,10 +30,28 @@ func loadData(dataDir string) *FeaturesIndex {
 	}
 	wg.Wait()
 
-	// features
+	// background index
 
-	features := NewFeaturesIndex(1, 20)
-	defer features.Finalize()
+	backgroundIndex := NewBackgroundIndex()
+
+	for featureClass, filename := range map[string]string{
+		"glacier":   "ne_50m_glaciated_areas.geojson",
+		"lake":      "ne_10m_lakes.geojson",
+		"land":      "ne_50m_land.geojson",
+		"marinepit": "ne_10m_bathymetry_E_6000.geojson",
+		"river":     "ne_50m_rivers_lake_centerlines_scale_rank.geojson",
+	} {
+		raw, err := os.ReadFile(filepath.Join(dataDir, filename))
+		if err != nil {
+			panic(err)
+		}
+		backgroundIndex.AddGeoJSON(raw, featureClass)
+	}
+
+	// features index
+
+	featuresIndex := NewFeaturesIndex(1, 20)
+	defer featuresIndex.Finalize()
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
@@ -55,7 +73,7 @@ func loadData(dataDir string) *FeaturesIndex {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
-			features.Add(NewCity(
+			featuresIndex.Add(NewCity(
 				records[1],             // name
 				records[7],             // feature code (capital, district capital, etc)
 				parseInt(records[14]),  // population
@@ -69,15 +87,7 @@ func loadData(dataDir string) *FeaturesIndex {
 		}
 	}
 
-	// background
-
-	//glaciers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_glaciated_areas.geojson"))
-	//lakes, err := os.ReadFile(filepath.Join(dataDir, "ne_10m_lakes.geojson"))
-	//lands, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_land.geojson"))
-	//marinepits, err := os.ReadFile(filepath.Join(dataDir, "ne_10m_bathymetry_E_6000.geojson"))
-	//rivers, err := os.ReadFile(filepath.Join(dataDir, "ne_50m_rivers_lake_centerlines_scale_rank.geojson"))
-
-	return features
+	return backgroundIndex, featuresIndex
 }
 
 func download(dataDir, url string) {
