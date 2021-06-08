@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-func loadData(dataDir string) *Features {
+func loadData(dataDir string) *FeaturesIndex {
 	var wg sync.WaitGroup
 	for _, url := range []string{
 		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
@@ -32,7 +32,7 @@ func loadData(dataDir string) *Features {
 
 	// features
 
-	features := NewFeatures(1, 20)
+	features := NewFeaturesIndex(1, 20)
 	defer features.Finalize()
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))

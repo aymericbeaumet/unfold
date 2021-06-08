@@ -12,7 +12,7 @@ type Feature interface {
 	Score() int
 }
 
-type Features struct {
+type FeaturesIndex struct {
 	minPrecisionBits uint
 	maxPrecisionBits uint
 
@@ -21,8 +21,8 @@ type Features struct {
 	featuresByGeohash map[uint64][]Feature
 }
 
-func NewFeatures(minPrecisionBits, maxPrecisionBits uint) *Features {
-	return &Features{
+func NewFeaturesIndex(minPrecisionBits, maxPrecisionBits uint) *FeaturesIndex {
+	return &FeaturesIndex{
 		minPrecisionBits: minPrecisionBits,
 		maxPrecisionBits: maxPrecisionBits,
 
@@ -32,7 +32,7 @@ func NewFeatures(minPrecisionBits, maxPrecisionBits uint) *Features {
 	}
 }
 
-func (feature *Features) Add(f Feature) {
+func (feature *FeaturesIndex) Add(f Feature) {
 	lon, lat := f.Coordinates()
 	hash := geohash.EncodeInt(lat, lon)
 	for bits := feature.minPrecisionBits; bits <= feature.maxPrecisionBits; bits++ {
@@ -41,7 +41,7 @@ func (feature *Features) Add(f Feature) {
 	}
 }
 
-func (feature *Features) Finalize() {
+func (feature *FeaturesIndex) Finalize() {
 	for ghash, features := range feature.featuresByGeohash {
 		sortFeatures(features)
 		if len(features) > feature.maxResults {
@@ -50,7 +50,7 @@ func (feature *Features) Finalize() {
 	}
 }
 
-func (feature *Features) Find(bbox geohash.Box, lim int) []Feature {
+func (feature *FeaturesIndex) Find(bbox geohash.Box, lim int) []Feature {
 	hash := geohash.EncodeInt(bbox.Center())
 
 	for bits := feature.maxPrecisionBits; bits >= feature.minPrecisionBits; bits-- {
@@ -83,7 +83,7 @@ func (feature *Features) Find(bbox geohash.Box, lim int) []Feature {
 	return nil
 }
 
-func (feature *Features) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Feature {
+func (feature *FeaturesIndex) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Feature {
 	if lim > feature.maxResults {
 		lim = feature.maxResults
 	}
