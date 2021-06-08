@@ -88,19 +88,31 @@ func (index *Index) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Fe
 		lim = index.maxResults
 	}
 
-	var out []Feature
-	for _, h := range append([]uint64{hash}, geohash.NeighborsIntWithPrecision(hash, bits)...) {
-		for _, f := range index.featuresByGeohash[h] {
-			lon, lat := f.Coordinates()
-			if bbox.Contains(lat, lon) {
-				out = append(out, f)
-			}
-		}
+	// identify which features lists should be used
+	featuresByGeohash := make(map[uint64][]Feature, 1+8)
+	featuresByGeohash[hash] = index.featuresByGeohash[hash]
+	for _, h := range geohash.NeighborsIntWithPrecision(hash, bits) {
+		featuresByGeohash[h] = index.featuresByGeohash[h]
 	}
 
-	sortFeatures(out)
-	if len(out) > lim {
-		out = out[:lim]
+	// leverage the fact these lists are sorted to pick 1 by 1 until out is full,
+	// or the lists are empty
+	out := make([]Feature, 0, lim)
+	for i := 0; len(featuresByGeohash) > 0; i++ {
+		for hash, features := range featuresByGeohash {
+			if i >= len(features) {
+				delete(featuresByGeohash, hash)
+				continue
+			}
+			feature := features[i]
+			lon, lat := feature.Coordinates()
+			if bbox.Contains(lat, lon) {
+				out = append(out, feature)
+				if len(out) >= lim {
+					return out
+				}
+			}
+		}
 	}
 
 	return out
