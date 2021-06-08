@@ -32,7 +32,7 @@ func NewIndex(minPrecisionBits, maxPrecisionBits uint) *Index {
 	}
 }
 
-func (index *Index) InsertPoint(f Feature) {
+func (index *Index) Add(f Feature) {
 	lon, lat := f.Coordinates()
 	hash := geohash.EncodeInt(lat, lon)
 	for bits := index.minPrecisionBits; bits <= index.maxPrecisionBits; bits++ {

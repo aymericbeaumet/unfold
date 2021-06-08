@@ -33,7 +33,7 @@ func loadData(dataDir string) *Index {
 	index := NewIndex(1, 20)
 	defer index.Finalize()
 
-	// cities
+	// features
 
 	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 	if err != nil {
@@ -55,7 +55,7 @@ func loadData(dataDir string) *Index {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
-			index.InsertPoint(NewCity(
+			index.Add(NewCity(
 				records[1],             // name
 				records[7],             // feature code (capital, district capital, etc)
 				parseInt(records[14]),  // population
