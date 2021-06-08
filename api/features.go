@@ -12,7 +12,7 @@ type Feature interface {
 	Score() int
 }
 
-type Index struct {
+type Features struct {
 	minPrecisionBits uint
 	maxPrecisionBits uint
 
@@ -21,8 +21,8 @@ type Index struct {
 	featuresByGeohash map[uint64][]Feature
 }
 
-func NewIndex(minPrecisionBits, maxPrecisionBits uint) *Index {
-	return &Index{
+func NewFeatures(minPrecisionBits, maxPrecisionBits uint) *Features {
+	return &Features{
 		minPrecisionBits: minPrecisionBits,
 		maxPrecisionBits: maxPrecisionBits,
 
@@ -32,28 +32,28 @@ func NewIndex(minPrecisionBits, maxPrecisionBits uint) *Index {
 	}
 }
 
-func (index *Index) Add(f Feature) {
+func (feature *Features) Add(f Feature) {
 	lon, lat := f.Coordinates()
 	hash := geohash.EncodeInt(lat, lon)
-	for bits := index.minPrecisionBits; bits <= index.maxPrecisionBits; bits++ {
+	for bits := feature.minPrecisionBits; bits <= feature.maxPrecisionBits; bits++ {
 		h := hash >> (64 - bits)
-		index.featuresByGeohash[h] = append(index.featuresByGeohash[h], f)
+		feature.featuresByGeohash[h] = append(feature.featuresByGeohash[h], f)
 	}
 }
 
-func (index *Index) Finalize() {
-	for ghash, features := range index.featuresByGeohash {
+func (feature *Features) Finalize() {
+	for ghash, features := range feature.featuresByGeohash {
 		sortFeatures(features)
-		if len(features) > index.maxResults {
-			index.featuresByGeohash[ghash] = index.featuresByGeohash[ghash][:index.maxResults]
+		if len(features) > feature.maxResults {
+			feature.featuresByGeohash[ghash] = feature.featuresByGeohash[ghash][:feature.maxResults]
 		}
 	}
 }
 
-func (index *Index) Find(bbox geohash.Box, lim int) []Feature {
+func (feature *Features) Find(bbox geohash.Box, lim int) []Feature {
 	hash := geohash.EncodeInt(bbox.Center())
 
-	for bits := index.maxPrecisionBits; bits >= index.minPrecisionBits; bits-- {
+	for bits := feature.maxPrecisionBits; bits >= feature.minPrecisionBits; bits-- {
 		h := hash >> (64 - bits)
 		neighbors := geohash.NeighborsIntWithPrecision(h, bits)
 
@@ -77,22 +77,22 @@ func (index *Index) Find(bbox geohash.Box, lim int) []Feature {
 			continue
 		}
 
-		return index.find(bbox, lim, h, bits)
+		return feature.find(bbox, lim, h, bits)
 	}
 
 	return nil
 }
 
-func (index *Index) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Feature {
-	if lim > index.maxResults {
-		lim = index.maxResults
+func (feature *Features) find(bbox geohash.Box, lim int, hash uint64, bits uint) []Feature {
+	if lim > feature.maxResults {
+		lim = feature.maxResults
 	}
 
 	// identify which features lists should be used
 	featuresByGeohash := make(map[uint64][]Feature, 1+8)
-	featuresByGeohash[hash] = index.featuresByGeohash[hash]
+	featuresByGeohash[hash] = feature.featuresByGeohash[hash]
 	for _, h := range geohash.NeighborsIntWithPrecision(hash, bits) {
-		featuresByGeohash[h] = index.featuresByGeohash[h]
+		featuresByGeohash[h] = feature.featuresByGeohash[h]
 	}
 
 	// leverage the fact these lists are sorted to pick 1 by 1 until out is full,
