@@ -13,8 +13,6 @@ const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
 
-const IMAGE_RATIO = 2;
-
 /* Map */
 
 const mapElement = document.getElementById("map");
@@ -80,7 +78,6 @@ function getLandStyle(scale = 1) {
 
 const landLayer = new VectorImageLayer({
   style: getLandStyle(),
-  imageRatio: IMAGE_RATIO,
   source: new VectorSource({
     format: new GeoJSON(),
     url: "http://localhost:9999/data/lands",
@@ -98,7 +95,6 @@ function getGlacierStyle(scale = 1) {
 }
 
 const glacierLayer = new VectorImageLayer({
-  imageRatio: IMAGE_RATIO,
   style: getGlacierStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -116,18 +112,22 @@ function getRiverStyle(scale = 1) {
   });
 }
 
+let _riverExtent;
 const riverLayer = new VectorImageLayer({
-  imageRatio: IMAGE_RATIO,
   style: getRiverStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
     url(extent) {
+      _riverExtent = extent.join(",");
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
       return `http://localhost:9999/background?bbox=${bbox}`;
     },
     strategy(extent) {
+      if (_riverExtent && _riverExtent != extent.join(",")) {
+        this.clear();
+      }
       return [extent];
     },
   }),
@@ -145,7 +145,6 @@ function getLakeStyle(scale = 1) {
 }
 
 const lakeLayer = new VectorImageLayer({
-  imageRatio: IMAGE_RATIO,
   style: getLakeStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -164,7 +163,6 @@ function getMarinepitStyle(scale = 1) {
 }
 
 const marinepitLayer = new VectorImageLayer({
-  imageRatio: IMAGE_RATIO,
   style: getMarinepitStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -200,24 +198,24 @@ function featuresStyle() {
   };
 }
 
-let _resolution;
+let _featuresResolution;
 const featuresLayer = new VectorImageLayer({
   declutter: true,
   style: featuresStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
     url(extent, resolution) {
-      _resolution = resolution;
+      _featuresResolution = resolution;
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
       return `http://localhost:9999/features?bbox=${bbox}`;
     },
     strategy(extent, resolution) {
-      if (_resolution) {
-        if (_resolution > resolution) {
+      if (_featuresResolution) {
+        if (_featuresResolution > resolution) {
           this.loadedExtentsRtree_.clear();
-        } else if (_resolution < resolution) {
+        } else if (_featuresResolution < resolution) {
           this.clear();
         }
       }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/mmcloughlin/geohash"
+	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/clip"
 	"github.com/paulmach/orb/geojson"
 )
 
@@ -45,12 +47,26 @@ func (index *BackgroundIndex) Find(bbox geohash.Box) *geojson.FeatureCollection 
 	out := geojson.NewFeatureCollection()
 	uniq := map[string]struct{}{}
 
+	bound := orb.Bound{
+		Min: orb.Point{bbox.MinLng, bbox.MinLat},
+		Max: orb.Point{bbox.MaxLng, bbox.MaxLat},
+	}
+
 	for lon := int(bbox.MinLng); lon <= int(bbox.MaxLng); lon++ {
 		for _, feature := range index.features[lon] {
 			id := feature.ID.(string)
 			if _, ok := uniq[id]; !ok {
 				uniq[id] = struct{}{}
-				out.Append(feature)
+				geometry := clip.Geometry(bound, orb.Clone(feature.Geometry))
+				if geometry != nil {
+					out.Append(&geojson.Feature{
+						ID:         feature.ID,
+						Type:       feature.Type,
+						BBox:       feature.BBox,
+						Geometry:   geometry,
+						Properties: feature.Properties,
+					})
+				}
 			}
 		}
 	}
