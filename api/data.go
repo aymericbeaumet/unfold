@@ -30,7 +30,7 @@ func loadData(dataDir string) *Index {
 	}
 	wg.Wait()
 
-	index := NewIndex(5, 20)
+	index := NewIndex(1, 20)
 	defer index.Finalize()
 
 	// cities
@@ -56,7 +56,7 @@ func loadData(dataDir string) *Index {
 		for scanner.Scan() {
 			records := strings.Split(scanner.Text(), "\t")
 			index.InsertPoint(NewCity(
-				records[2],             // name
+				records[1],             // name
 				records[7],             // feature code (capital, district capital, etc)
 				parseInt(records[14]),  // population
 				parseFloat(records[5]), // longitude
