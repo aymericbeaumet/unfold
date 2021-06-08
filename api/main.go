@@ -23,8 +23,7 @@ func main() {
 	router.Use(cors.Default())
 
 	router.GET("/background", func(c *gin.Context) {
-		bbox := parseBbox(c.Query("bbox"))
-		fc := backgroundIndex.Find(bbox)
+		fc := backgroundIndex.Find()
 		c.JSON(http.StatusOK, fc)
 	})
 

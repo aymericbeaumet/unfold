@@ -1,75 +1,38 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/mmcloughlin/geohash"
-	"github.com/paulmach/orb"
-	"github.com/paulmach/orb/clip"
 	"github.com/paulmach/orb/geojson"
+	"github.com/paulmach/orb/simplify"
 )
 
 type BackgroundIndex struct {
-	features map[int][]*geojson.Feature
-	seq      int
+	collection geojson.FeatureCollection
 }
 
 func NewBackgroundIndex() *BackgroundIndex {
 	return &BackgroundIndex{
-		features: map[int][]*geojson.Feature{},
+		collection: geojson.FeatureCollection{},
 	}
 }
 
 func (index *BackgroundIndex) AddGeoJSON(raw []byte, featureClass string) {
-	index.seq++
+	s := simplify.DouglasPeucker(0.0001)
 
 	fc, err := geojson.UnmarshalFeatureCollection(raw)
 	if err != nil {
 		panic(err)
 	}
 
-	for i, feature := range fc.Features {
-		feature.ID = fmt.Sprintf("%d_%d", index.seq, i)
+	for _, feature := range fc.Features {
+		feature.Geometry = s.Simplify(feature.Geometry)
 
 		delete(feature.Properties, "featureclass")
 		feature.Properties["featureClass"] = featureClass
 
-		bbox := feature.BBox.Bound()
-		minLon, maxLon := bbox.Left(), bbox.Right()
-
-		for i := int(minLon); i <= int(maxLon); i++ {
-			index.features[i] = append(index.features[i], feature)
-		}
+		index.collection.Append(feature)
 	}
 }
 
-func (index *BackgroundIndex) Find(bbox geohash.Box) *geojson.FeatureCollection {
-	out := geojson.NewFeatureCollection()
-	uniq := map[string]struct{}{}
-
-	bound := orb.Bound{
-		Min: orb.Point{bbox.MinLng, bbox.MinLat},
-		Max: orb.Point{bbox.MaxLng, bbox.MaxLat},
-	}
-
-	for lon := int(bbox.MinLng); lon <= int(bbox.MaxLng); lon++ {
-		for _, feature := range index.features[lon] {
-			id := feature.ID.(string)
-			if _, ok := uniq[id]; !ok {
-				uniq[id] = struct{}{}
-				geometry := clip.Geometry(bound, orb.Clone(feature.Geometry))
-				if geometry != nil {
-					out.Append(&geojson.Feature{
-						ID:         feature.ID,
-						Type:       feature.Type,
-						BBox:       feature.BBox,
-						Geometry:   geometry,
-						Properties: feature.Properties,
-					})
-				}
-			}
-		}
-	}
-
-	return out
+func (index *BackgroundIndex) Find() *geojson.FeatureCollection {
+	return &index.collection
 }

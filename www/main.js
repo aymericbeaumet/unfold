@@ -112,24 +112,11 @@ function getRiverStyle(scale = 1) {
   });
 }
 
-let _riverExtent;
 const riverLayer = new VectorImageLayer({
   style: getRiverStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url(extent) {
-      _riverExtent = extent.join(",");
-      const min = toLonLat(extent.slice(0, 2));
-      const max = toLonLat(extent.slice(2, 4));
-      const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `http://localhost:9999/background?bbox=${bbox}`;
-    },
-    strategy(extent) {
-      if (_riverExtent && _riverExtent != extent.join(",")) {
-        this.clear();
-      }
-      return [extent];
-    },
+    url: "http://localhost:9999/background",
   }),
 });
 
