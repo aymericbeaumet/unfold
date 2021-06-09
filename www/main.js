@@ -199,7 +199,7 @@ map.addLayer(graticuleLayer);
 /* Hover and Click */
 
 map.on("pointermove", function (event) {
-  const feature = getFeature(event);
+  const feature = getFeatureAtPixel(event);
   if (feature) {
     document.body.classList.add("hand");
   } else {
@@ -208,10 +208,17 @@ map.on("pointermove", function (event) {
 });
 
 map.on("singleclick", function (event) {
-  const feature = getFeature(event);
+  const feature = getFeatureAtPixel(event);
   if (feature) {
-    contentOverlayElement.innerHTML = JSON.stringify(feature);
-    overlayElement.classList.add("visible");
+    const [lon, lat] = toLonLat(feature.getGeometry().getCoordinates());
+    fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=100&format=json&origin=*`
+    )
+      .then((res) => res.json())
+      .then((json) => {
+        contentOverlayElement.innerHTML = JSON.stringify(json, null, 2);
+        overlayElement.classList.add("visible");
+      });
   } else {
     overlayElement.classList.remove("visible");
   }
@@ -240,7 +247,7 @@ const coordinatesElement = contextMenuElement.querySelector(
 map.on("contextmenu", function (event) {
   event.preventDefault();
 
-  const feature = getFeature(event);
+  const feature = getFeatureAtPixel(event);
   const [lon, lat] = feature
     ? toLonLat(feature.getGeometry().getCoordinates())
     : toLonLat(event.coordinate);
@@ -299,7 +306,7 @@ document.body.addEventListener("mousedown", function (event) {
 
 /* Helpers */
 
-function getFeature(event) {
+function getFeatureAtPixel(event) {
   return map.forEachFeatureAtPixel(
     event.pixel,
     function (feature) {
