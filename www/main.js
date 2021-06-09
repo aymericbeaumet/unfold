@@ -152,6 +152,7 @@ function featuresLayerStyle() {
 let _featuresResolution;
 const featuresLayer = new VectorLayer({
   declutter: true,
+  renderBuffer: 200,
   imageRatio: 2,
   style: featuresLayerStyle(),
   source: new VectorSource({
@@ -206,7 +207,7 @@ map.on("pointermove", function (event) {
   }
 });
 
-map.on("click", function (event) {
+map.on("singleclick", function (event) {
   const feature = getFeature(event);
   if (feature) {
     contentOverlayElement.innerHTML = JSON.stringify(feature);
