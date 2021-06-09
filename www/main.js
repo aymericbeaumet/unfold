@@ -210,6 +210,8 @@ map.on("pointermove", function (event) {
 map.on("singleclick", function (event) {
   const feature = getFeatureAtPixel(event);
   if (feature) {
+    contentOverlayElement.innerHTML = "loading...";
+    overlayElement.classList.add("visible");
     const [lon, lat] = toLonLat(feature.getGeometry().getCoordinates());
     fetch(
       `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=100&format=json&origin=*`
@@ -217,7 +219,6 @@ map.on("singleclick", function (event) {
       .then((res) => res.json())
       .then((json) => {
         contentOverlayElement.innerHTML = JSON.stringify(json, null, 2);
-        overlayElement.classList.add("visible");
       });
   } else {
     overlayElement.classList.remove("visible");
