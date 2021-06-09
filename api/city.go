@@ -31,7 +31,8 @@ func (c *City) Coordinates() (float64, float64) {
 
 func (c *City) Properties() map[string]interface{} {
 	return map[string]interface{}{
-		"name": c.name,
+		"featureClass": "city",
+		"name":         c.name,
 	}
 }
 

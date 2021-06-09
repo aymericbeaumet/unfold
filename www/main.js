@@ -1,3 +1,4 @@
+import VectorLayer from "ol/layer/Vector";
 import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
@@ -21,10 +22,8 @@ const map = new Map({
   controls: [],
   view: new View({
     center: fromLonLat([2.3522, 48.8566]),
-    smoothResolutionConstraint: false,
     zoom: 6,
   }),
-  layers: [],
 });
 
 mapElement.style.backgroundColor = COLOR_WATER;
@@ -127,6 +126,7 @@ map.addLayer(backgroundLayer);
 
 function featuresLayerStyle() {
   const style = new Style({
+    zindex: 100,
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
       points: 4,
@@ -150,7 +150,7 @@ function featuresLayerStyle() {
 }
 
 let _featuresResolution;
-const featuresLayer = new VectorImageLayer({
+const featuresLayer = new VectorLayer({
   declutter: true,
   imageRatio: 2,
   style: featuresLayerStyle(),
@@ -195,6 +195,40 @@ const graticuleLayer = new GraticuleLayer({
 
 map.addLayer(graticuleLayer);
 
+/* Hover and Click */
+
+map.on("pointermove", function (event) {
+  const feature = getFeature(event);
+  if (feature) {
+    document.body.classList.add("hand");
+  } else {
+    document.body.classList.remove("hand");
+  }
+});
+
+map.on("click", function (event) {
+  const feature = getFeature(event);
+  if (feature) {
+    contentOverlayElement.innerHTML = JSON.stringify(feature);
+    overlayElement.classList.add("visible");
+  } else {
+    overlayElement.classList.remove("visible");
+  }
+});
+
+/* Overlay */
+
+const overlayElement = document.getElementById("overlay");
+const contentOverlayElement = overlayElement.getElementsByTagName("div")[0];
+const closeOverlayElement = overlayElement.querySelector(
+  '[data-action="close"]'
+);
+
+closeOverlayElement.addEventListener("click", function (event) {
+  event.preventDefault();
+  overlayElement.classList.remove("visible");
+});
+
 /* Context menu */
 
 const contextMenuElement = document.getElementById("context-menu");
@@ -205,7 +239,10 @@ const coordinatesElement = contextMenuElement.querySelector(
 map.on("contextmenu", function (event) {
   event.preventDefault();
 
-  const [lon, lat] = toLonLat(event.coordinate);
+  const feature = getFeature(event);
+  const [lon, lat] = feature
+    ? toLonLat(feature.getGeometry().getCoordinates())
+    : toLonLat(event.coordinate);
   coordinatesElement.innerHTML = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   coordinatesElement.setAttribute("data-lat", lat);
   coordinatesElement.setAttribute("data-lon", lon);
@@ -229,36 +266,51 @@ map.on("contextmenu", function (event) {
   contextMenuElement.classList.add("visible");
 });
 
-document.body.addEventListener(
-  "mousedown",
-  function (event) {
-    event.preventDefault();
+document.body.addEventListener("mousedown", function (event) {
+  event.preventDefault();
 
-    if (event.target.offsetParent === contextMenuElement) {
-      const lat = coordinatesElement.getAttribute("data-lat");
-      const lon = coordinatesElement.getAttribute("data-lon");
+  if (event.target.offsetParent === contextMenuElement) {
+    const lat = coordinatesElement.getAttribute("data-lat");
+    const lon = coordinatesElement.getAttribute("data-lon");
 
-      switch (event.target.getAttribute("data-action")) {
-        case "coordinates":
-          navigator.clipboard.writeText([lat, lon].join(", "));
-          break;
-        case "fullscreen":
-          mapElement.requestFullscreen();
-          break;
-        case "googlemaps":
-          const latlon = encodeURIComponent([lat, lon].join(","));
-          window.open(
-            `https://www.google.com/maps?q=${latlon}&ll=${latlon}&z=8`,
-            "_blank"
-          );
-          break;
-        case "sourcecode":
-          window.open("https://github.com/aymericbeaumet/retromap", "_blank");
-          break;
-      }
+    switch (event.target.getAttribute("data-action")) {
+      case "coordinates":
+        navigator.clipboard.writeText([lat, lon].join(", "));
+        break;
+      case "fullscreen":
+        mapElement.requestFullscreen();
+        break;
+      case "googlemaps":
+        const latlon = encodeURIComponent([lat, lon].join(","));
+        window.open(
+          `https://www.google.com/maps?q=${latlon}&ll=${latlon}&z=8`,
+          "_blank"
+        );
+        break;
+      case "sourcecode":
+        window.open("https://github.com/aymericbeaumet/retromap", "_blank");
+        break;
     }
+  }
 
-    contextMenuElement.classList.remove("visible");
-  },
-  true
-);
+  contextMenuElement.classList.remove("visible");
+});
+
+/* Helpers */
+
+function getFeature(event) {
+  return map.forEachFeatureAtPixel(
+    event.pixel,
+    function (feature) {
+      switch (feature.getProperties()["featureClass"]) {
+        case "city":
+        case "glacier":
+        case "lake":
+        case "marinepit":
+        case "river":
+          return feature;
+      }
+    },
+    { hitTolerance: 5 }
+  );
+}

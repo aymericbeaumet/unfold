@@ -15,7 +15,14 @@
       html, body {
         margin: 0;
         height: 100%;
+      }
+
+      body, #overlay, #context-menu {
         cursor: url("./static/assets/cursor.cur"), default;
+      }
+
+      body.hand, button, a {
+        cursor: url("./static/assets/hand.cur"), default;
       }
 
       #map {
@@ -23,6 +30,20 @@
         top: 0;
         bottom: 0;
         width: 100%;
+      }
+
+      #overlay {
+        position: absolute;
+        top:0;
+        right:0;
+        height: 100%;
+        width: 30%;
+        background-color: red;
+        display: none;
+      }
+
+      #overlay.visible {
+        display: block
       }
 
       #context-menu {
@@ -53,6 +74,11 @@
   </head>
   <body>
     <div id="map"></div>
+
+    <div id="overlay">
+      <button data-action="close">X</button>
+      <div></div>
+    </div>
 
     <div id="context-menu">
       <div class="item" data-action="coordinates"></div>
