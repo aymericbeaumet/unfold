@@ -1,4 +1,4 @@
-import VectorLayer from "ol/layer/Vector";
+import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
@@ -112,8 +112,8 @@ function backgroundLayerStyle() {
   };
 }
 
-const backgroundLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const backgroundLayer = new VectorImageLayer({
+  imageRatio: 2,
   style: backgroundLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
@@ -150,9 +150,9 @@ function featuresLayerStyle() {
 }
 
 let _featuresResolution;
-const featuresLayer = new VectorLayer({
-  updateWhileInteracting: true,
+const featuresLayer = new VectorImageLayer({
   declutter: true,
+  imageRatio: 2,
   style: featuresLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
