@@ -1,4 +1,4 @@
-import VectorImageLayer from "ol/layer/VectorImage";
+import VectorLayer from "ol/layer/Vector";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
 import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
@@ -29,139 +29,103 @@ const map = new Map({
 
 mapElement.style.backgroundColor = COLOR_WATER;
 
-/* Land layer */
+/* Background layer */
 
-function getLandStyle(scale = 1) {
-  return [
+function backgroundLayerStyle() {
+  const land = [
     new Style({
       zIndex: 1,
-      stroke: new Stroke({ color: COLOR_INK, width: scale * 31 }),
+      stroke: new Stroke({ color: COLOR_INK, width: 31 }),
     }),
     new Style({
       zIndex: 2,
-      stroke: new Stroke({ color: COLOR_WATER, width: scale * 30 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: 30 }),
     }),
     new Style({
       zIndex: 3,
-      stroke: new Stroke({ color: COLOR_INK, width: scale * 21 }),
+      stroke: new Stroke({ color: COLOR_INK, width: 21 }),
     }),
     new Style({
       zIndex: 4,
-      stroke: new Stroke({ color: COLOR_WATER, width: scale * 20 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: 20 }),
     }),
     new Style({
       zIndex: 5,
-      stroke: new Stroke({ color: COLOR_INK, width: scale * 15 }),
+      stroke: new Stroke({ color: COLOR_INK, width: 15 }),
     }),
     new Style({
       zIndex: 6,
-      stroke: new Stroke({ color: COLOR_WATER, width: scale * 14 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: 14 }),
     }),
     new Style({
       zIndex: 7,
-      stroke: new Stroke({ color: COLOR_INK, width: scale * 9 }),
+      stroke: new Stroke({ color: COLOR_INK, width: 9 }),
     }),
     new Style({
       zIndex: 8,
-      stroke: new Stroke({ color: COLOR_WATER, width: scale * 8 }),
+      stroke: new Stroke({ color: COLOR_WATER, width: 8 }),
     }),
     new Style({
       zIndex: 9,
-      stroke: new Stroke({ color: COLOR_INK, width: scale * 3 }),
+      stroke: new Stroke({ color: COLOR_INK, width: 3 }),
     }),
     new Style({
       zIndex: 10,
       fill: new Fill({ color: COLOR_LAND }),
     }),
   ];
-}
 
-const landLayer = new VectorImageLayer({
-  style: getLandStyle(),
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url: "http://localhost:9999/data/lands",
-  }),
-});
-
-map.addLayer(landLayer);
-
-/* Glacier layer */
-
-function getGlacierStyle(scale = 1) {
-  return new Style({
+  const glacier = new Style({
+    zIndex: 20,
     fill: new Fill({ color: "darkgray" }),
   });
-}
 
-const glacierLayer = new VectorImageLayer({
-  style: getGlacierStyle(),
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url: "http://localhost:9999/data/glaciers",
-  }),
-});
-
-map.addLayer(glacierLayer);
-
-/* River layer */
-
-function getRiverStyle(scale = 1) {
-  return new Style({
-    stroke: new Stroke({ color: COLOR_INK, width: scale }),
+  const river = new Style({
+    zIndex: 30,
+    stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
+
+  const lake = new Style({
+    zindex: 40,
+    fill: new Fill({ color: COLOR_WATER }),
+    stroke: new Stroke({ color: COLOR_INK, width: 1 }),
+  });
+
+  const marinepit = new Style({
+    zindex: 50,
+    fill: new Fill({ color: "darkblue" }),
+  });
+
+  return function (feature) {
+    switch (feature.get("featureClass")) {
+      case "glacier":
+        return glacier;
+      case "lake":
+        return lake;
+      case "land":
+        return land;
+      case "marinepit":
+        return marinepit;
+      case "river":
+        return river;
+    }
+  };
 }
 
-const riverLayer = new VectorImageLayer({
-  style: getRiverStyle(),
+const backgroundLayer = new VectorLayer({
+  updateWhileInteracting: true,
+  style: backgroundLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
     url: "http://localhost:9999/background",
   }),
 });
 
-map.addLayer(riverLayer);
-
-/* Lake layer */
-
-function getLakeStyle(scale = 1) {
-  return new Style({
-    fill: new Fill({ color: COLOR_WATER }),
-    stroke: new Stroke({ color: COLOR_INK, width: scale }),
-  });
-}
-
-const lakeLayer = new VectorImageLayer({
-  style: getLakeStyle(),
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url: "http://localhost:9999/data/lakes",
-  }),
-});
-
-map.addLayer(lakeLayer);
-
-/* Marine pit layer */
-
-function getMarinepitStyle(scale = 1) {
-  return new Style({
-    fill: new Fill({ color: "darkblue" }),
-  });
-}
-
-const marinepitLayer = new VectorImageLayer({
-  style: getMarinepitStyle(),
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url: "http://localhost:9999/data/marinepits",
-  }),
-});
-
-map.addLayer(marinepitLayer);
+map.addLayer(backgroundLayer);
 
 /* Features layer */
 
-function featuresStyle() {
+function featuresLayerStyle() {
   const style = new Style({
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
@@ -186,9 +150,10 @@ function featuresStyle() {
 }
 
 let _featuresResolution;
-const featuresLayer = new VectorImageLayer({
+const featuresLayer = new VectorLayer({
+  updateWhileInteracting: true,
   declutter: true,
-  style: featuresStyle(),
+  style: featuresLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
     url(extent, resolution) {
