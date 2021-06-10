@@ -79,7 +79,6 @@ function backgroundLayerStyle() {
     text: new Text({
       fill: new Fill({ color: COLOR_INK }),
       font: 'bold 18px "Luminari"',
-      textAlign: "left",
     }),
   });
 
@@ -148,6 +147,7 @@ function featuresLayerStyle() {
     }),
     text: new Text({
       font: 'bold 14px "Luminari"',
+      textAlign: "left",
       offsetX: 8,
       offsetY: 2,
       fill: new Fill({ color: COLOR_INK }),
