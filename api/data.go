@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -14,113 +15,124 @@ import (
 
 func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 	var wg sync.WaitGroup
-	for _, url := range []string{
-		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
-		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson",
-		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson",
-		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
-		"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
-		"https://download.geonames.org/export/dump/cities500.zip",
-	} {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			download(dataDir, url)
-		}(url)
-	}
-	wg.Wait()
 
 	// background index
 
 	backgroundIndex := NewBackgroundIndex()
 
-	for featureClass, filename := range map[string]string{
-		"glacier":   "ne_50m_glaciated_areas.geojson",
-		"lake":      "ne_10m_lakes.geojson",
-		"land":      "ne_50m_land.geojson",
-		"marinepit": "ne_10m_bathymetry_E_6000.geojson",
-		"river":     "ne_50m_rivers_lake_centerlines_scale_rank.geojson",
+	for featureClass, url := range map[string]string{
+		"bathymetry": "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
+		"glacier":    "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson",
+		"lake":       "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson",
+		"land":       "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
+		"marine":     "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_geography_marine_polys.geojson",
+		"river":      "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
 	} {
-		raw, err := os.ReadFile(filepath.Join(dataDir, filename))
-		if err != nil {
-			panic(err)
-		}
-		backgroundIndex.AddGeoJSON(raw, featureClass)
+		wg.Add(1)
+		go func(featureClass, url string) {
+			defer wg.Done()
+
+			if err := download(dataDir, url); err != nil {
+				log.Fatalln(err)
+			}
+
+			raw, err := os.ReadFile(filepath.Join(dataDir, filepath.Base(url)))
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			if err := backgroundIndex.AddGeoJSON(raw, featureClass); err != nil {
+				log.Fatalln(err)
+			}
+		}(featureClass, url)
 	}
 
 	// features index
 
 	featuresIndex := NewFeaturesIndex(1, 20)
-	defer featuresIndex.Finalize()
 
-	citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer citiesZip.Close()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer featuresIndex.Finalize()
 
-	for _, file := range citiesZip.File {
-		if file.Name != "cities500.txt" {
-			log.Fatalln("unexpected file in archive")
+		if err := download(dataDir, "https://download.geonames.org/export/dump/cities500.zip"); err != nil {
+			log.Fatalln(err)
 		}
 
-		f, err := file.Open()
+		citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		defer f.Close()
+		defer citiesZip.Close()
 
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			records := strings.Split(scanner.Text(), "\t")
-			featuresIndex.Add(NewCity(
-				records[1],             // name
-				records[7],             // feature code (capital, district capital, etc)
-				parseInt(records[14]),  // population
-				parseFloat(records[5]), // longitude
-				parseFloat(records[4]), // latitude
-			))
-		}
+		for _, file := range citiesZip.File {
+			if file.Name != "cities500.txt" {
+				log.Fatalln("unexpected file in archive")
+			}
 
-		if err := scanner.Err(); err != nil {
-			log.Fatalln(err)
+			f, err := file.Open()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			defer f.Close()
+
+			scanner := bufio.NewScanner(f)
+			for scanner.Scan() {
+				records := strings.Split(scanner.Text(), "\t")
+				featuresIndex.Add(NewCity(
+					records[1],             // name
+					records[7],             // feature code (capital, district capital, etc)
+					parseInt(records[14]),  // population
+					parseFloat(records[5]), // longitude
+					parseFloat(records[4]), // latitude
+				))
+			}
+
+			if err := scanner.Err(); err != nil {
+				log.Fatalln(err)
+			}
 		}
-	}
+	}()
+
+	wg.Wait()
 
 	return backgroundIndex, featuresIndex
 }
 
-func download(dataDir, url string) {
+func download(dataDir, url string) error {
 	name := filepath.Base(url)
 	path := filepath.Join(dataDir, name)
 
 	if _, err := os.Stat(path); err == nil {
 		log.Println("Skipping", path)
-		return
+		return nil
 	}
 	log.Println("Downloading", path)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		log.Fatalln(name, err)
+		return err
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		log.Fatalln(name, err)
+		return err
 	}
 	defer f.Close()
 
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		log.Fatalln(name, err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalln(name, "unexpected status code", resp.Status)
+		return fmt.Errorf("unexpected status code %d", resp.Status)
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		log.Fatalln(err)
+		return err
 	}
+
+	return nil
 }

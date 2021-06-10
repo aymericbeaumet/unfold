@@ -74,6 +74,15 @@ function backgroundLayerStyle() {
     }),
   ];
 
+  const marine = new Style({
+    zindex: 15,
+    text: new Text({
+      fill: new Fill({ color: COLOR_INK }),
+      font: 'bold 18px "Luminari"',
+      textAlign: "left",
+    }),
+  });
+
   const glacier = new Style({
     zIndex: 20,
     fill: new Fill({ color: "darkgray" }),
@@ -90,21 +99,24 @@ function backgroundLayerStyle() {
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
 
-  const marinepit = new Style({
+  const bathymetry = new Style({
     zindex: 50,
     fill: new Fill({ color: "darkblue" }),
   });
 
   return function (feature) {
     switch (feature.get("featureClass")) {
+      case "bathymetry":
+        return bathymetry;
       case "glacier":
         return glacier;
       case "lake":
         return lake;
       case "land":
         return land;
-      case "marinepit":
-        return marinepit;
+      case "marine":
+        marine.getText().setText(feature.get("name"));
+        return marine;
       case "river":
         return river;
     }
@@ -138,7 +150,6 @@ function featuresLayerStyle() {
       font: 'bold 14px "Luminari"',
       offsetX: 8,
       offsetY: 2,
-      textAlign: "left",
       fill: new Fill({ color: COLOR_INK }),
       stroke: new Stroke({ color: COLOR_LAND, width: 2 }),
     }),
@@ -319,7 +330,7 @@ function getFeatureAtPixel(event) {
   return map.forEachFeatureAtPixel(
     event.pixel,
     function (feature) {
-      switch (feature.getProperties()["featureClass"]) {
+      switch (feature.get("featureClass")) {
         case "city":
           return feature;
       }
