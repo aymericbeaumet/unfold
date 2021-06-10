@@ -258,6 +258,9 @@ map.on("movestart", function () {
 
 map.on("moveend", function () {
   isMoving = false;
+});
+
+document.addEventListener("mouseup", function () {
   document.body.classList.remove("cursor-move");
 });
 
