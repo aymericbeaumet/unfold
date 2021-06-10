@@ -199,6 +199,8 @@ map.addLayer(graticuleLayer);
 /* Hover and Click */
 
 map.on("pointermove", function (event) {
+  event.preventDefault();
+
   const feature = getFeatureAtPixel(event);
   if (feature) {
     document.body.classList.add("hand");
@@ -207,7 +209,9 @@ map.on("pointermove", function (event) {
   }
 });
 
-map.on("singleclick", function (event) {
+map.on("click", function (event) {
+  event.preventDefault();
+
   const feature = getFeatureAtPixel(event);
   if (feature) {
     contentOverlayElement.innerHTML = "loading...";
@@ -223,6 +227,10 @@ map.on("singleclick", function (event) {
   } else {
     overlayElement.classList.remove("visible");
   }
+});
+
+map.on("dblclick", function (event) {
+  event.preventDefault();
 });
 
 /* Overlay */
