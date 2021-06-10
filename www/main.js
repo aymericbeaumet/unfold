@@ -321,10 +321,6 @@ function getFeatureAtPixel(event) {
     function (feature) {
       switch (feature.getProperties()["featureClass"]) {
         case "city":
-        case "glacier":
-        case "lake":
-        case "marinepit":
-        case "river":
           return feature;
       }
     },
