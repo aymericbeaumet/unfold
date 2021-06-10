@@ -19,11 +19,15 @@
       }
 
       body, #overlay, #context-menu {
-        cursor: url("./static/assets/cursor.cur"), default;
+        cursor: url("./static/assets/default.cur"), default;
       }
 
-      body.hand, button, a {
-        cursor: url("./static/assets/hand.cur"), default;
+      body.cursor-point, button, a {
+        cursor: url("./static/assets/point.cur"), default;
+      }
+
+      body.cursor-move, button, a {
+        cursor: url("./static/assets/move.cur"), default;
       }
 
       #map {

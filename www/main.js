@@ -154,6 +154,7 @@ function featuresLayerStyle() {
       stroke: new Stroke({ color: COLOR_LAND, width: 2 }),
     }),
   });
+
   return function (feature) {
     style.getText().setText(feature.get("name"));
     return style;
@@ -213,10 +214,12 @@ map.on("pointermove", function (event) {
   event.preventDefault();
 
   const feature = getFeatureAtPixel(event);
-  if (feature) {
-    document.body.classList.add("hand");
-  } else {
-    document.body.classList.remove("hand");
+  if (!isMoving) {
+    if (feature) {
+      document.body.classList.add("cursor-point");
+    } else {
+      document.body.classList.remove("cursor-point");
+    }
   }
 });
 
@@ -242,6 +245,20 @@ map.on("click", function (event) {
 
 map.on("dblclick", function (event) {
   event.preventDefault();
+});
+
+/* Move */
+
+let isMoving = false;
+
+map.on("movestart", function () {
+  isMoving = true;
+  document.body.classList.add("cursor-move");
+});
+
+map.on("moveend", function () {
+  isMoving = false;
+  document.body.classList.remove("cursor-move");
 });
 
 /* Overlay */
@@ -335,6 +352,6 @@ function getFeatureAtPixel(event) {
           return feature;
       }
     },
-    { hitTolerance: 5 }
+    { hitTolerance: 4 }
   );
 }
