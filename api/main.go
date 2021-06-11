@@ -34,7 +34,7 @@ func main() {
 		c.JSON(http.StatusOK, fc)
 	})
 
-	if err := router.Run(":9999"); err != nil {
+	if err := router.Run("0.0.0.0:9999"); err != nil {
 		log.Fatalln(err)
 	}
 }

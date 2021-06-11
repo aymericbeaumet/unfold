@@ -9,6 +9,8 @@ import { fromLonLat, toLonLat } from "ol/proj";
 
 /* Constants */
 
+const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:9999`;
+
 const COLOR_GRATICULE = "#5E5E5E";
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
@@ -128,7 +130,7 @@ const backgroundLayer = new VectorImageLayer({
   style: backgroundLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: "http://localhost:9999/background",
+    url: `${API_BASE_URL}/background`,
   }),
 });
 
@@ -175,7 +177,7 @@ const featuresLayer = new VectorLayer({
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `http://localhost:9999/features?bbox=${bbox}`;
+      return `${API_BASE_URL}/features?bbox=${bbox}`;
     },
     strategy(extent, resolution) {
       if (_featuresResolution) {
