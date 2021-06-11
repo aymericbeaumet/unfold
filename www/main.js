@@ -123,6 +123,7 @@ function backgroundLayerStyle() {
 }
 
 const backgroundLayer = new VectorImageLayer({
+  declutter: true,
   imageRatio: 2,
   style: backgroundLayerStyle(),
   source: new VectorSource({
@@ -163,8 +164,8 @@ function featuresLayerStyle() {
 
 let _featuresResolution;
 const featuresLayer = new VectorLayer({
-  declutter: true,
   renderBuffer: 200,
+  declutter: true,
   imageRatio: 2,
   style: featuresLayerStyle(),
   source: new VectorSource({
