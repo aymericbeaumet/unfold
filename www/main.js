@@ -75,7 +75,7 @@ function backgroundLayerStyle() {
   ];
 
   const marine = new Style({
-    zindex: 15,
+    zIndex: 15,
     text: new Text({
       fill: new Fill({ color: COLOR_INK }),
       font: 'bold 18px "Luminari"',
@@ -93,13 +93,13 @@ function backgroundLayerStyle() {
   });
 
   const lake = new Style({
-    zindex: 40,
+    zIndex: 40,
     fill: new Fill({ color: COLOR_WATER }),
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
 
   const bathymetry = new Style({
-    zindex: 50,
+    zIndex: 50,
     fill: new Fill({ color: "darkblue" }),
   });
 
@@ -138,7 +138,7 @@ map.addLayer(backgroundLayer);
 
 function featuresLayerStyle() {
   const style = new Style({
-    zindex: 100,
+    zIndex: 100,
     image: new RegularShape({
       fill: new Fill({ color: COLOR_INK }),
       points: 4,
