@@ -165,7 +165,7 @@ let _featuresResolution;
 const featuresLayer = new VectorLayer({
   declutter: true,
   renderBuffer: 200,
-  imageRatio: 2,
+  updateWhileInteracting: true,
   style: featuresLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
