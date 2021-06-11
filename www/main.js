@@ -15,6 +15,8 @@ const COLOR_GRATICULE = "#5E5E5E";
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
+const COLOR_WATER_SHALLOW = "#D6C6AB";
+const COLOR_WATER_DEEP = "#BDAE97";
 
 /* Map */
 
@@ -33,51 +35,61 @@ mapElement.style.backgroundColor = COLOR_WATER;
 /* Background layer */
 
 function backgroundLayerStyle() {
+  const bathymetry_shallow = new Style({
+    zIndex: 100,
+    fill: new Fill({ color: COLOR_WATER_SHALLOW }),
+  });
+
+  const bathymetry_deep = new Style({
+    zIndex: 200,
+    fill: new Fill({ color: COLOR_WATER_DEEP }),
+  });
+
   const land = [
     new Style({
-      zIndex: 1,
+      zIndex: 301,
       stroke: new Stroke({ color: COLOR_INK, width: 31 }),
     }),
     new Style({
-      zIndex: 2,
+      zIndex: 302,
       stroke: new Stroke({ color: COLOR_WATER, width: 30 }),
     }),
     new Style({
-      zIndex: 3,
+      zIndex: 303,
       stroke: new Stroke({ color: COLOR_INK, width: 21 }),
     }),
     new Style({
-      zIndex: 4,
+      zIndex: 304,
       stroke: new Stroke({ color: COLOR_WATER, width: 20 }),
     }),
     new Style({
-      zIndex: 5,
+      zIndex: 305,
       stroke: new Stroke({ color: COLOR_INK, width: 15 }),
     }),
     new Style({
-      zIndex: 6,
+      zIndex: 306,
       stroke: new Stroke({ color: COLOR_WATER, width: 14 }),
     }),
     new Style({
-      zIndex: 7,
+      zIndex: 307,
       stroke: new Stroke({ color: COLOR_INK, width: 9 }),
     }),
     new Style({
-      zIndex: 8,
+      zIndex: 308,
       stroke: new Stroke({ color: COLOR_WATER, width: 8 }),
     }),
     new Style({
-      zIndex: 9,
+      zIndex: 309,
       stroke: new Stroke({ color: COLOR_INK, width: 3 }),
     }),
     new Style({
-      zIndex: 10,
+      zIndex: 310,
       fill: new Fill({ color: COLOR_LAND }),
     }),
   ];
 
   const marine = new Style({
-    zIndex: 15,
+    zIndex: 400,
     text: new Text({
       fill: new Fill({ color: COLOR_INK }),
       font: 'bold 18px "Luminari"',
@@ -85,30 +97,27 @@ function backgroundLayerStyle() {
   });
 
   const glacier = new Style({
-    zIndex: 20,
+    zIndex: 500,
     fill: new Fill({ color: "darkgray" }),
   });
 
   const river = new Style({
-    zIndex: 30,
+    zIndex: 600,
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
 
   const lake = new Style({
-    zIndex: 40,
+    zIndex: 700,
     fill: new Fill({ color: COLOR_WATER }),
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
 
-  const bathymetry = new Style({
-    zIndex: 50,
-    fill: new Fill({ color: "darkblue" }),
-  });
-
   return function (feature) {
     switch (feature.get("featureClass")) {
-      case "bathymetry":
-        return bathymetry;
+      case "bathymetry_deep":
+        return bathymetry_deep;
+      case "bathymetry_shallow":
+        return bathymetry_shallow;
       case "glacier":
         return glacier;
       case "lake":
