@@ -20,13 +20,18 @@ func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 
 	backgroundIndex := NewBackgroundIndex()
 
-	for featureClass, url := range map[string]string{
-		"bathymetry": "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson",
-		"glacier":    "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson",
-		"lake":       "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson",
-		"land":       "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson",
-		"marine":     "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_geography_marine_polys.geojson",
-		"river":      "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson",
+	for _, source := range []struct {
+		featureClass string
+		url          string
+	}{
+		{"bathymetry", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson"},
+		{"glacier", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson"},
+		{"lake", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson"},
+		{"land", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson"},
+		{"marine", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_geography_marine_polys.geojson"},
+		{"river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_europe.geojson"},
+		{"river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_north_america.geojson"},
+		{"river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson"},
 	} {
 		wg.Add(1)
 		go func(featureClass, url string) {
@@ -45,7 +50,7 @@ func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 			if err := backgroundIndex.AddGeoJSON(raw, featureClass); err != nil {
 				log.Fatalln(err)
 			}
-		}(featureClass, url)
+		}(source.featureClass, source.url)
 	}
 
 	// features index
