@@ -251,16 +251,13 @@ map.on("dblclick", function (event) {
 
 let isMoving = false;
 
-map.on("movestart", function () {
+map.on("pointerdrag", function () {
   isMoving = true;
   document.body.classList.add("cursor-move");
 });
 
-map.on("moveend", function () {
-  isMoving = false;
-});
-
 document.addEventListener("mouseup", function () {
+  isMoving = false;
   document.body.classList.remove("cursor-move");
 });
 
