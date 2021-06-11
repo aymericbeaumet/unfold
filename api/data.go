@@ -32,11 +32,12 @@ func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 		go func(featureClass, url string) {
 			defer wg.Done()
 
-			if err := download(dataDir, url); err != nil {
+			path, err := download(dataDir, url)
+			if err != nil {
 				log.Fatalln(err)
 			}
 
-			raw, err := os.ReadFile(filepath.Join(dataDir, filepath.Base(url)))
+			raw, err := os.ReadFile(path)
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -56,11 +57,12 @@ func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 		defer wg.Done()
 		defer featuresIndex.Finalize()
 
-		if err := download(dataDir, "https://download.geonames.org/export/dump/cities500.zip"); err != nil {
+		path, err := download(dataDir, "https://download.geonames.org/export/dump/cities500.zip")
+		if err != nil {
 			log.Fatalln(err)
 		}
 
-		citiesZip, err := zip.OpenReader(filepath.Join(dataDir, "cities500.zip"))
+		citiesZip, err := zip.OpenReader(path)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -100,39 +102,39 @@ func loadData(dataDir string) (*BackgroundIndex, *FeaturesIndex) {
 	return backgroundIndex, featuresIndex
 }
 
-func download(dataDir, url string) error {
+func download(dataDir, url string) (string, error) {
 	name := filepath.Base(url)
 	path := filepath.Join(dataDir, name)
 
 	if _, err := os.Stat(path); err == nil {
 		log.Println("Skipping", path)
-		return nil
+		return path, nil
 	}
 	log.Println("Downloading", path)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+		return "", err
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer f.Close()
 
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code %d", resp.Status)
+		return "", fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return path, nil
 }
