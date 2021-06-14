@@ -378,6 +378,10 @@ searchInputElement.addEventListener("keydown", function (event) {
   }
 });
 
+searchInputElement.addEventListener("focus", function (event) {
+  this.selectionStart = this.selectionEnd = this.value.length;
+});
+
 /* Helpers */
 
 function getFeatureAtPixel(event) {
