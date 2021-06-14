@@ -353,6 +353,31 @@ document.body.addEventListener("mousedown", function (event) {
   contextMenuElement.classList.remove("visible");
 });
 
+/* Search */
+
+const searchContainerElement = document.getElementById("search");
+const searchInputElement = searchContainerElement.querySelector("input");
+
+document.addEventListener("keydown", function (event) {
+  if (
+    event.key === "/" ||
+    ((event.ctrlKey || event.metaKey) && event.key === "f")
+  ) {
+    event.preventDefault();
+    searchInputElement.focus();
+  }
+});
+
+searchInputElement.addEventListener("keydown", function (event) {
+  if (
+    event.key.toLowerCase() === "escape" ||
+    (event.ctrlKey && event.key === "c")
+  ) {
+    event.preventDefault();
+    searchInputElement.blur();
+  }
+});
+
 /* Helpers */
 
 function getFeatureAtPixel(event) {

@@ -37,6 +37,13 @@
         width: 100%;
       }
 
+      #search {
+        position: absolute;
+        top:0;
+        left:0;
+        width: 200px;
+      }
+
       #overlay {
         position: absolute;
         top:0;
@@ -53,7 +60,7 @@
 
       #context-menu {
         position: fixed;
-        z-index: 10000;
+        z-index: 100;
         width: 150px;
         background: #1b1a1a;
         border-radius: 5px;
@@ -79,6 +86,17 @@
   </head>
   <body>
     <div id="map"></div>
+
+    <div id="search">
+      <input type="search" placeholder="Search..." list="search-results" />
+      <datalist id="search-results">
+        <option value="Chocolate">
+        <option value="Coconut">
+        <option value="Mint">
+        <option value="Strawberry">
+        <option value="Vanilla">
+      </datalist>
+    </div>
 
     <div id="overlay">
       <button data-action="close">X</button>
