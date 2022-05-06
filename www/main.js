@@ -9,8 +9,6 @@ import { fromLonLat, toLonLat } from "ol/proj";
 
 /* Constants */
 
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:9999`;
-
 const COLOR_GRATICULE = "#5E5E5E";
 const COLOR_INK = "#000000";
 const COLOR_LAND = "#E0C9A6";
@@ -139,7 +137,7 @@ const backgroundLayer = new VectorImageLayer({
   style: backgroundLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: `${API_BASE_URL}/background`,
+    url: `${process.env.API_URL}/background`,
   }),
 });
 
@@ -186,7 +184,7 @@ const featuresLayer = new VectorLayer({
       const min = toLonLat(extent.slice(0, 2));
       const max = toLonLat(extent.slice(2, 4));
       const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `${API_BASE_URL}/features?bbox=${bbox}`;
+      return `${process.env.API_URL}/features?bbox=${bbox}`;
     },
     strategy(extent, resolution) {
       if (_featuresResolution) {
@@ -232,18 +230,6 @@ map.on("pointerdrag", function () {
 
 document.addEventListener("mouseup", function () {
   document.body.classList.remove("cursor-move");
-});
-
-/* Overlay */
-
-const overlayElement = document.getElementById("overlay");
-const closeOverlayElement = overlayElement.querySelector(
-  '[data-action="close"]'
-);
-
-closeOverlayElement.addEventListener("click", function (event) {
-  event.preventDefault();
-  overlayElement.classList.remove("visible");
 });
 
 /* Context menu */
