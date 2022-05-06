@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,23 +19,27 @@ var httpClient = http.Client{
 func main() {
 	backgroundIndex, featuresIndex := loadData("./data")
 
-	router := gin.Default()
-	router.Use(cors.Default())
+	svc := gin.Default()
+	svc.Use(cors.Default())
 
-	router.GET("/background", func(c *gin.Context) {
+	svc.GET("/background", func(c *gin.Context) {
 		fc := backgroundIndex.Find()
 		c.JSON(http.StatusOK, fc)
 	})
 
-	router.GET("/features", func(c *gin.Context) {
+	svc.GET("/features", func(c *gin.Context) {
 		bbox := parseBbox(c.Query("bbox"))
 		lim := parseInt(c.DefaultQuery("lim", "100"))
 		fc := featuresIndex.Find(bbox, lim)
 		c.JSON(http.StatusOK, fc)
 	})
 
-	if err := router.Run("0.0.0.0:9999"); err != nil {
-		log.Fatalln(err)
+	port := os.Getenv("PORT")
+	if len(port) == 0 {
+		port = "8080"
+	}
+	if err := svc.Run("0.0.0.0:" + port); err != nil {
+		panic(err)
 	}
 }
 
