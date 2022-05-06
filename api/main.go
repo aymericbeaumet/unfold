@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/mmcloughlin/geohash"
 )
@@ -20,7 +21,14 @@ func main() {
 	backgroundIndex, featuresIndex := loadData("./data")
 
 	svc := gin.Default()
-	svc.Use(cors.Default())
+
+	svc.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowAllOrigins = false
+	corsConfig.AllowOrigins = strings.Split(os.Getenv("CORS_ALLOW_ORIGINS"), ",")
+	corsConfig.AllowCredentials = true
+	svc.Use(cors.New(corsConfig))
 
 	svc.GET("/background", func(c *gin.Context) {
 		fc := backgroundIndex.Find()

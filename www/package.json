@@ -2,7 +2,7 @@
   "name": "retromap",
   "version": "1.0.0",
   "scripts": {
-    "start": "API_URL=http://localhost:8080 parcel serve index.html",
+    "dev": "API_URL=http://localhost:8080 parcel serve -p 3000 index.html",
     "build": "parcel build index.html"
   },
   "dependencies": {
