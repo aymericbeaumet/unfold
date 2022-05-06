@@ -220,63 +220,23 @@ const graticuleLayer = new GraticuleLayer({
 
 map.addLayer(graticuleLayer);
 
-/* Hover and Click */
-
-map.on("pointermove", function (event) {
-  event.preventDefault();
-
-  const feature = getFeatureAtPixel(event);
-  if (!isMoving) {
-    if (feature) {
-      document.body.classList.add("cursor-point");
-    } else {
-      document.body.classList.remove("cursor-point");
-    }
-  }
-});
-
-map.on("click", function (event) {
-  event.preventDefault();
-
-  const feature = getFeatureAtPixel(event);
-  if (feature) {
-    contentOverlayElement.innerHTML = "loading...";
-    overlayElement.classList.add("visible");
-    const [lon, lat] = toLonLat(feature.getGeometry().getCoordinates());
-    fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=100&format=json&origin=*`
-    )
-      .then((res) => res.json())
-      .then((json) => {
-        contentOverlayElement.innerHTML = JSON.stringify(json, null, 2);
-      });
-  } else {
-    overlayElement.classList.remove("visible");
-  }
-});
-
 map.on("dblclick", function (event) {
   event.preventDefault();
 });
 
 /* Move */
 
-let isMoving = false;
-
 map.on("pointerdrag", function () {
-  isMoving = true;
   document.body.classList.add("cursor-move");
 });
 
 document.addEventListener("mouseup", function () {
-  isMoving = false;
   document.body.classList.remove("cursor-move");
 });
 
 /* Overlay */
 
 const overlayElement = document.getElementById("overlay");
-const contentOverlayElement = overlayElement.getElementsByTagName("div")[0];
 const closeOverlayElement = overlayElement.querySelector(
   '[data-action="close"]'
 );
@@ -344,42 +304,10 @@ document.body.addEventListener("mousedown", function (event) {
           "_blank"
         );
         break;
-      case "sourcecode":
-        window.open("https://github.com/aymericbeaumet/retromap", "_blank");
-        break;
     }
   }
 
   contextMenuElement.classList.remove("visible");
-});
-
-/* Search */
-
-const searchContainerElement = document.getElementById("search");
-const searchInputElement = searchContainerElement.querySelector("input");
-
-document.addEventListener("keydown", function (event) {
-  if (
-    event.key === "/" ||
-    ((event.ctrlKey || event.metaKey) && event.key === "f")
-  ) {
-    event.preventDefault();
-    searchInputElement.focus();
-  }
-});
-
-searchInputElement.addEventListener("keydown", function (event) {
-  if (
-    event.key.toLowerCase() === "escape" ||
-    (event.ctrlKey && event.key === "c")
-  ) {
-    event.preventDefault();
-    searchInputElement.blur();
-  }
-});
-
-searchInputElement.addEventListener("focus", function (event) {
-  this.selectionStart = this.selectionEnd = this.value.length;
 });
 
 /* Helpers */

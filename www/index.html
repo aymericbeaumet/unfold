@@ -1,32 +1,38 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>World Map</title>
-    <link rel="stylesheet" href="https://openlayers.org/en/latest/css/ol.css" type="text/css">
-    <link rel="shortcut icon" href="./static/assets/favicon.png">
+    <link
+      rel="stylesheet"
+      href="https://openlayers.org/en/latest/css/ol.css"
+      type="text/css"
+    />
+    <link rel="shortcut icon" href="./static/assets/favicon.png" />
     <style>
       @font-face {
-        font-family: 'Luminari';
+        font-family: "Luminari";
         font-style: normal;
         font-weight: normal;
-        src: local('Luminari'), url('./static/assets/Luminari-Regular.woff') format('woff');
+        src: local("Luminari"),
+          url("./static/assets/Luminari-Regular.woff") format("woff");
       }
 
-      html, body {
+      html,
+      body {
         margin: 0;
         height: 100%;
       }
 
-      body, #overlay, #context-menu {
+      body,
+      #overlay,
+      #context-menu {
         cursor: url("./static/assets/default.cur"), default;
       }
 
-      body.cursor-point, button, a {
-        cursor: url("./static/assets/point.cur"), default;
-      }
-
-      body.cursor-move, button, a {
+      body.cursor-move,
+      button,
+      a {
         cursor: url("./static/assets/move.cur"), default;
       }
 
@@ -39,15 +45,15 @@
 
       #search {
         position: absolute;
-        top:0;
-        left:0;
+        top: 0;
+        left: 0;
         width: 200px;
       }
 
       #overlay {
         position: absolute;
-        top:0;
-        right:0;
+        top: 0;
+        right: 0;
         height: 100%;
         width: 30%;
         background-color: red;
@@ -55,7 +61,7 @@
       }
 
       #overlay.visible {
-        display: block
+        display: block;
       }
 
       #context-menu {
@@ -87,17 +93,6 @@
   <body>
     <div id="map"></div>
 
-    <div id="search">
-      <input type="search" placeholder="Search..." list="search-results" />
-      <datalist id="search-results">
-        <option value="Chocolate">
-        <option value="Coconut">
-        <option value="Mint">
-        <option value="Strawberry">
-        <option value="Vanilla">
-      </datalist>
-    </div>
-
     <div id="overlay">
       <button data-action="close">X</button>
       <div></div>
@@ -107,9 +102,8 @@
       <div class="item" data-action="coordinates"></div>
       <div class="item" data-action="googlemaps">Google Maps</div>
       <div class="item" data-action="fullscreen">Fullscreen</div>
-      <div class="item" data-action="sourcecode">Source Code</div>
     </div>
 
-    <script src="./main.js"></script>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>
