@@ -32,6 +32,7 @@ func main() {
 
 	svc.GET("/background", func(c *gin.Context) {
 		fc := backgroundIndex.Find()
+		c.Writer.Header().Set("Cache-Control", "public, max-age=86400") // one day
 		c.JSON(http.StatusOK, fc)
 	})
 
