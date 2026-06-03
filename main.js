@@ -66,10 +66,11 @@ const view = new View({
   zoom: initialHash ? initialHash.zoom : viewportFitZoom(),
   // Lock the view inside the latitudinal extent of the map; horizontal pan
   // can run freely so the wrapX sources below can repeat the world. Hard-stop
-  // at the top/bottom edges — no rubber-band-and-snap-back.
+  // at the top/bottom edges and at the min/max zoom — no rubber-band.
   extent: [-Infinity, -MERCATOR_Y_MAX, Infinity, MERCATOR_Y_MAX],
   constrainOnlyCenter: false,
   smoothExtentConstraint: false,
+  smoothResolutionConstraint: false,
 });
 
 const map = new Map({
