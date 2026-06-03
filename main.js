@@ -2,6 +2,8 @@ import VectorLayer from "ol/layer/Vector";
 import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
+import Feature from "ol/Feature";
+import Point from "ol/geom/Point";
 import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
@@ -15,6 +17,11 @@ const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
 const COLOR_WATER_SHALLOW = "#D6C6AB";
 const COLOR_WATER_DEEP = "#BDAE97";
+
+const MAX_VISIBLE_CITIES = 100;
+
+import BACKGROUND_URL from "url:./data/background.geojson";
+import CITIES_URL from "url:./data/cities.bin";
 
 /* Map */
 
@@ -137,7 +144,7 @@ const backgroundLayer = new VectorImageLayer({
   style: backgroundLayerStyle(),
   source: new VectorSource({
     format: new GeoJSON(),
-    url: `${process.env.API_URL}/background`,
+    url: BACKGROUND_URL,
   }),
 });
 
@@ -171,35 +178,79 @@ function featuresLayerStyle() {
   };
 }
 
-let _featuresResolution;
+const featuresSource = new VectorSource();
 const featuresLayer = new VectorLayer({
   renderBuffer: 200,
   declutter: true,
-  imageRatio: 2,
+  source: featuresSource,
   style: featuresLayerStyle(),
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url(extent, resolution) {
-      _featuresResolution = resolution;
-      const min = toLonLat(extent.slice(0, 2));
-      const max = toLonLat(extent.slice(2, 4));
-      const bbox = encodeURIComponent([...min, ...max].join(","));
-      return `${process.env.API_URL}/features?bbox=${bbox}`;
-    },
-    strategy(extent, resolution) {
-      if (_featuresResolution) {
-        if (_featuresResolution > resolution) {
-          this.loadedExtentsRtree_.clear();
-        } else if (_featuresResolution < resolution) {
-          this.clear();
-        }
-      }
-      return [extent];
-    },
-  }),
 });
 
 map.addLayer(featuresLayer);
+
+// Cities are pre-sorted by score (capital bonus, then district capital bonus,
+// then raw population) and live in a Web Worker as TypedArray views over a
+// transferred ArrayBuffer. Score-ordered bbox lookup with early termination at
+// MAX_VISIBLE_CITIES happens off the main thread, so neither the initial
+// payload nor pan/zoom can jank rendering.
+const citiesWorker = new Worker(
+  new URL("./cities-worker.js", import.meta.url),
+  { type: "module" },
+);
+
+let workerReady = false;
+let queryCounter = 0;
+let latestQueryId = 0;
+
+citiesWorker.onmessage = (event) => {
+  const msg = event.data;
+  if (msg.type === "ready") {
+    workerReady = true;
+    refreshVisibleCities();
+  } else if (msg.type === "result") {
+    // Drop stale results from intermediate viewport states.
+    if (msg.id !== latestQueryId) return;
+    const features = msg.cities.map(
+      ([name, lon, lat]) =>
+        new Feature({
+          geometry: new Point(fromLonLat([lon, lat])),
+          name,
+          featureClass: "city",
+        }),
+    );
+    featuresSource.clear(true);
+    featuresSource.addFeatures(features);
+  }
+};
+
+async function bootCitiesWorker() {
+  const res = await fetch(CITIES_URL);
+  if (!res.ok) throw new Error(`cities.bin → HTTP ${res.status}`);
+  const buffer = await res.arrayBuffer();
+  citiesWorker.postMessage({ type: "init", buffer }, [buffer]);
+}
+
+function refreshVisibleCities() {
+  if (!workerReady) return;
+  const extent = map.getView().calculateExtent(map.getSize());
+  const [minLon, minLat] = toLonLat(extent.slice(0, 2));
+  const [maxLon, maxLat] = toLonLat(extent.slice(2, 4));
+  const id = ++queryCounter;
+  latestQueryId = id;
+  citiesWorker.postMessage({
+    type: "query",
+    id,
+    minLon,
+    minLat,
+    maxLon,
+    maxLat,
+    limit: MAX_VISIBLE_CITIES,
+  });
+}
+
+map.on("moveend", refreshVisibleCities);
+
+bootCitiesWorker().catch((err) => console.error(err));
 
 /* Graticule layer */
 
@@ -209,10 +260,10 @@ const graticuleLayer = new GraticuleLayer({
   intervals: [10],
   showLabels: true,
   lonLabelFormatter(lon) {
-    return lon < 0 ? lon + 360 : lon;
+    return String(lon < 0 ? lon + 360 : lon);
   },
   latLabelFormatter(lat) {
-    return Math.abs(lat);
+    return String(Math.abs(lat));
   },
 });
 
