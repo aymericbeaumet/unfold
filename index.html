@@ -22,6 +22,9 @@
       body {
         margin: 0;
         height: 100%;
+        background: #f0dec2;
+        overflow: hidden;
+        font-family: "Luminari", "Palatino", "Georgia", serif;
       }
 
       body,
@@ -32,51 +35,119 @@
 
       body.cursor-move,
       button,
-      a {
+      a,
+      .search-result {
         cursor: url("./static/assets/move.cur"), default;
       }
 
       #map {
         position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 100%;
+        inset: 0;
       }
 
-      #search {
+      /* ── adventure-map aesthetic ─────────────────────────────────────── */
+
+      /* Procedural parchment grain that multiplies into the map colours. */
+      #paper {
         position: absolute;
-        top: 0;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+        mix-blend-mode: multiply;
+        opacity: 0.45;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='8'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.32  0 0 0 0 0.15  0 0 0 0.85 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        background-size: 600px 600px;
+      }
+
+      /* Soft brown vignette around the edges. */
+      #vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 11;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 55%,
+          rgba(90, 55, 20, 0.35) 100%
+        );
+      }
+
+      /* Warm sun-spot in the upper right corner. */
+      #sun {
+        position: absolute;
+        top: -120px;
+        right: -120px;
+        width: 380px;
+        height: 380px;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 12;
+        background: radial-gradient(
+          circle,
+          rgba(255, 230, 160, 0.55) 0%,
+          rgba(255, 200, 120, 0.18) 45%,
+          transparent 70%
+        );
+      }
+
+      /* Torn paper edges along top and bottom. */
+      #torn-top,
+      #torn-bottom {
+        position: absolute;
         left: 0;
-        width: 200px;
-      }
-
-      #overlay {
-        position: absolute;
-        top: 0;
         right: 0;
-        height: 100%;
-        width: 30%;
-        background-color: red;
-        display: none;
+        height: 24px;
+        pointer-events: none;
+        z-index: 13;
+        background: #f0dec2;
+      }
+      #torn-top {
+        top: 0;
+        clip-path: polygon(
+          0 0, 100% 0, 100% 60%,
+          97% 100%, 94% 50%, 91% 100%, 87% 60%, 83% 100%, 79% 55%, 75% 100%,
+          71% 65%, 67% 100%, 62% 50%, 58% 100%, 54% 70%, 50% 100%, 46% 55%,
+          42% 100%, 38% 65%, 33% 100%, 29% 50%, 25% 100%, 21% 70%, 17% 100%,
+          13% 55%, 9% 100%, 5% 65%, 2% 100%, 0 60%
+        );
+      }
+      #torn-bottom {
+        bottom: 0;
+        clip-path: polygon(
+          0 100%, 100% 100%, 100% 40%,
+          97% 0, 94% 50%, 91% 0, 87% 40%, 83% 0, 79% 45%, 75% 0, 71% 35%,
+          67% 0, 62% 50%, 58% 0, 54% 30%, 50% 0, 46% 45%, 42% 0, 38% 35%,
+          33% 0, 29% 50%, 25% 0, 21% 30%, 17% 0, 13% 45%, 9% 0, 5% 35%,
+          2% 0, 0 40%
+        );
       }
 
-      #overlay.visible {
-        display: block;
+      /* Compass rose, etched onto the parchment. */
+      #compass {
+        position: absolute;
+        bottom: 36px;
+        right: 36px;
+        width: 88px;
+        height: 88px;
+        pointer-events: none;
+        z-index: 14;
+        opacity: 0.55;
       }
+
+      /* ── context menu ────────────────────────────────────────────────── */
 
       #context-menu {
         position: fixed;
-        z-index: 100;
-        width: 150px;
+        z-index: 60;
+        width: 170px;
         background: #1b1a1a;
         border-radius: 5px;
         display: none;
+        font-family: "Palatino", "Georgia", serif;
       }
-
       #context-menu.visible {
         display: block;
       }
-
       #context-menu .item {
         padding: 8px 10px;
         font-size: 15px;
@@ -84,19 +155,188 @@
         cursor: pointer;
         border-radius: inherit;
       }
-
       #context-menu .item:hover {
         background: #343434;
+      }
+
+      /* ── search palette (cmd/ctrl+K) ─────────────────────────────────── */
+
+      #search-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(40, 25, 10, 0.35);
+        z-index: 80;
+        display: none;
+      }
+      #search-backdrop.visible {
+        display: block;
+      }
+
+      #search {
+        position: fixed;
+        top: 12vh;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(520px, 92vw);
+        background: #f6e6c8;
+        border: 1px solid #8a6a3a;
+        border-radius: 6px;
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.35),
+          inset 0 0 60px rgba(170, 130, 70, 0.18);
+        z-index: 81;
+        display: none;
+        overflow: hidden;
+      }
+      #search.visible {
+        display: block;
+      }
+      #search-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 14px 18px;
+        font: 18px "Luminari", "Palatino", serif;
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid #b58e54;
+        color: #2b1a0a;
+        outline: none;
+      }
+      #search-input::placeholder {
+        color: #8a6a3a;
+        opacity: 0.7;
+      }
+      #search-results {
+        max-height: 50vh;
+        overflow-y: auto;
+      }
+      .search-result {
+        padding: 9px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        color: #2b1a0a;
+        border-bottom: 1px dashed rgba(138, 106, 58, 0.35);
+      }
+      .search-result:last-child {
+        border-bottom: 0;
+      }
+      .search-result.active {
+        background: rgba(170, 130, 70, 0.25);
+      }
+      .search-result .name {
+        font: 17px "Luminari", "Palatino", serif;
+      }
+      .search-result .meta {
+        font: 12px "Palatino", "Georgia", serif;
+        color: #6a4a20;
+        opacity: 0.85;
+        white-space: nowrap;
+      }
+      .search-empty {
+        padding: 18px;
+        color: #8a6a3a;
+        font: 14px "Palatino", "Georgia", serif;
+        font-style: italic;
+      }
+
+      /* ── loading overlay ─────────────────────────────────────────────── */
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0dec2;
+        transition: opacity 600ms ease-out;
+      }
+      #loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #loading-card {
+        text-align: center;
+        color: #2b1a0a;
+      }
+      #loading-card .title {
+        font: 30px "Luminari", "Palatino", serif;
+        letter-spacing: 0.08em;
+        margin-bottom: 18px;
+      }
+      #loading-bar {
+        width: 280px;
+        height: 4px;
+        background: rgba(43, 26, 10, 0.18);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+      #loading-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: #2b1a0a;
+        transition: width 200ms ease-out;
+      }
+      #loading-status {
+        margin-top: 12px;
+        font: 13px "Palatino", "Georgia", serif;
+        font-style: italic;
+        color: #6a4a20;
+        opacity: 0.9;
       }
     </style>
   </head>
   <body>
     <div id="map"></div>
 
+    <div id="paper"></div>
+    <div id="vignette"></div>
+    <div id="sun"></div>
+    <div id="torn-top"></div>
+    <div id="torn-bottom"></div>
+
+    <svg id="compass" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <g fill="none" stroke="#2b1a0a" stroke-width="1.2">
+        <circle cx="50" cy="50" r="42" />
+        <circle cx="50" cy="50" r="32" />
+        <path d="M50 6 L54 50 L50 94 L46 50 Z" fill="#2b1a0a" />
+        <path d="M6 50 L50 54 L94 50 L50 46 Z" fill="#2b1a0a" opacity="0.6" />
+      </g>
+      <g fill="#2b1a0a" font-family="Luminari, Palatino, serif" font-size="9" text-anchor="middle">
+        <text x="50" y="14">N</text>
+        <text x="50" y="92">S</text>
+        <text x="92" y="53">E</text>
+        <text x="8" y="53">W</text>
+      </g>
+    </svg>
+
     <div id="context-menu">
       <div class="item" data-action="coordinates"></div>
       <div class="item" data-action="googlemaps">Google Maps</div>
       <div class="item" data-action="fullscreen">Fullscreen</div>
+    </div>
+
+    <div id="search-backdrop"></div>
+    <div id="search" role="dialog" aria-label="Search cities">
+      <input
+        id="search-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Search a city  (e.g. Paris, or Cairo Egypt)"
+      />
+      <div id="search-results"></div>
+    </div>
+
+    <div id="loading">
+      <div id="loading-card">
+        <div class="title">Unfolding the world…</div>
+        <div id="loading-bar"><div id="loading-bar-fill"></div></div>
+        <div id="loading-status">summoning ancient cartographers</div>
+      </div>
     </div>
 
     <script type="module" src="./main.js"></script>

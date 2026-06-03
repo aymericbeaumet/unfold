@@ -5,12 +5,21 @@
 //   data/cities.bin          — cities sorted by score, packed binary
 //
 // The binary layout (little-endian) lets the worker map TypedArray views
-// directly over the fetched ArrayBuffer with zero parse cost:
-//   [u32]             count
-//   [f32 * count]     lons
-//   [f32 * count]     lats
-//   [u32 * count+1]   cumulative name offsets (count+1 entries; last = total)
-//   [u8  * total]     concatenated utf-8 name bytes
+// directly over the fetched ArrayBuffer with zero parse cost.
+//
+// Header (10 × u32 = 40 bytes), each a byte offset into the buffer:
+//   count, lonsOff, latsOff, popsOff, countriesOff,
+//   nameOffsetsOff, namesOff, searchOffsetsOff, searchesOff, totalSize
+//
+// Sections (each starts at its declared offset, padded to 4 bytes):
+//   [f32  * count]    lons
+//   [f32  * count]    lats
+//   [u32  * count]    populations
+//   [u8   * 2*count]  ISO-3166-1 alpha-2 country codes (raw ASCII pair)
+//   [u32  * count+1]  display-name end offsets (last = total bytes)
+//   [u8   * total_d]  utf-8 display name bytes
+//   [u32  * count+1]  search-string end offsets
+//   [u8   * total_s]  normalized "name countryName countryCode" bytes
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -97,6 +106,14 @@ async function buildBackground() {
   console.log(`wrote ${features.length} features → ${path.relative(__dirname, out)}`);
 }
 
+function normalizeSearch(s) {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 async function buildCities() {
   const filePath = await downloadCached(CITIES_URL);
   const zip = await JSZip.loadAsync(await fs.readFile(filePath));
@@ -104,20 +121,61 @@ async function buildCities() {
   if (!entry) throw new Error("cities500.txt missing from archive");
   const text = await entry.async("string");
 
+  const countryName = new Intl.DisplayNames(["en"], { type: "region" });
+  // Common informal aliases so users can type the country they expect.
+  const COUNTRY_ALIASES = {
+    GB: ["uk", "britain", "england"],
+    US: ["usa", "america"],
+    KR: ["south korea"],
+    KP: ["north korea"],
+    CZ: ["czechia"],
+    AE: ["uae", "emirates"],
+    RU: ["russia"],
+    CD: ["drc", "congo"],
+    CG: ["congo"],
+    NL: ["holland"],
+    VA: ["vatican"],
+    CI: ["ivory coast"],
+    TW: ["taiwan"],
+  };
+  const countryCache = new Map();
+  function searchString(name, asciiName, country) {
+    let cn = countryCache.get(country);
+    if (cn === undefined) {
+      const parts = [];
+      try {
+        const en = countryName.of(country);
+        if (en) parts.push(normalizeSearch(en));
+      } catch {}
+      for (const alias of COUNTRY_ALIASES[country] || []) {
+        parts.push(normalizeSearch(alias));
+      }
+      cn = parts.join(" ");
+      countryCache.set(country, cn);
+    }
+    return [normalizeSearch(asciiName || name), cn, country.toLowerCase()]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   const cities = [];
   for (const line of text.split("\n")) {
     if (!line) continue;
     const cols = line.split("\t");
     const featureCode = cols[7];
+    const country = (cols[8] || "  ").padEnd(2).slice(0, 2);
     const population = parseInt(cols[14], 10) || 0;
     let score = population;
     if (featureCode === "PPLC") score += 1_000_000_000;
     else if (featureCode === "PPLA") score += 100_000_000;
     cities.push({
       name: cols[1],
+      country,
+      population,
       lon: round(parseFloat(cols[5]), CITY_COORD_PRECISION),
       lat: round(parseFloat(cols[4]), CITY_COORD_PRECISION),
       score,
+      search: searchString(cols[1], cols[2], country),
     });
   }
   cities.sort((a, b) => b.score - a.score);
@@ -125,31 +183,61 @@ async function buildCities() {
   const count = cities.length;
   const enc = new TextEncoder();
   const nameBytes = cities.map((c) => enc.encode(c.name));
+  const searchBytes = cities.map((c) => enc.encode(c.search));
   const totalNameBytes = nameBytes.reduce((acc, b) => acc + b.length, 0);
+  const totalSearchBytes = searchBytes.reduce((acc, b) => acc + b.length, 0);
 
-  const headerSize = 4;
-  const lonsSize = count * 4;
-  const latsSize = count * 4;
-  const offsetsSize = (count + 1) * 4;
-  const buf = new ArrayBuffer(headerSize + lonsSize + latsSize + offsetsSize + totalNameBytes);
+  const HEADER_FIELDS = 10;
+  const headerSize = HEADER_FIELDS * 4;
+  const pad4 = (n) => (n + 3) & ~3;
 
-  const counts = new Uint32Array(buf, 0, 1);
-  counts[0] = count;
+  const lonsOff = headerSize;
+  const latsOff = lonsOff + count * 4;
+  const popsOff = latsOff + count * 4;
+  const countriesOff = popsOff + count * 4;
+  const nameOffsetsOff = pad4(countriesOff + count * 2);
+  const namesOff = nameOffsetsOff + (count + 1) * 4;
+  const searchOffsetsOff = pad4(namesOff + totalNameBytes);
+  const searchesOff = searchOffsetsOff + (count + 1) * 4;
+  const totalSize = pad4(searchesOff + totalSearchBytes);
 
-  const lons = new Float32Array(buf, headerSize, count);
-  const lats = new Float32Array(buf, headerSize + lonsSize, count);
-  const offsets = new Uint32Array(buf, headerSize + lonsSize + latsSize, count + 1);
-  const names = new Uint8Array(buf, headerSize + lonsSize + latsSize + offsetsSize);
+  const buf = new ArrayBuffer(totalSize);
+  const header = new Uint32Array(buf, 0, HEADER_FIELDS);
+  header.set([
+    count,
+    lonsOff, latsOff, popsOff, countriesOff,
+    nameOffsetsOff, namesOff, searchOffsetsOff, searchesOff,
+    totalSize,
+  ]);
 
-  let cursor = 0;
+  const lons = new Float32Array(buf, lonsOff, count);
+  const lats = new Float32Array(buf, latsOff, count);
+  const pops = new Uint32Array(buf, popsOff, count);
+  const countries = new Uint8Array(buf, countriesOff, count * 2);
+  const nameOffsets = new Uint32Array(buf, nameOffsetsOff, count + 1);
+  const names = new Uint8Array(buf, namesOff, totalNameBytes);
+  const searchOffsets = new Uint32Array(buf, searchOffsetsOff, count + 1);
+  const searches = new Uint8Array(buf, searchesOff, totalSearchBytes);
+
+  let nameCursor = 0;
+  let searchCursor = 0;
   for (let i = 0; i < count; i++) {
     lons[i] = cities[i].lon;
     lats[i] = cities[i].lat;
-    offsets[i] = cursor;
-    names.set(nameBytes[i], cursor);
-    cursor += nameBytes[i].length;
+    pops[i] = cities[i].population;
+    countries[i * 2] = cities[i].country.charCodeAt(0) || 32;
+    countries[i * 2 + 1] = cities[i].country.charCodeAt(1) || 32;
+
+    nameOffsets[i] = nameCursor;
+    names.set(nameBytes[i], nameCursor);
+    nameCursor += nameBytes[i].length;
+
+    searchOffsets[i] = searchCursor;
+    searches.set(searchBytes[i], searchCursor);
+    searchCursor += searchBytes[i].length;
   }
-  offsets[count] = cursor;
+  nameOffsets[count] = nameCursor;
+  searchOffsets[count] = searchCursor;
 
   const out = path.join(OUT_DIR, "cities.bin");
   await fs.writeFile(out, Buffer.from(buf));
