@@ -10,21 +10,15 @@
     />
     <link rel="shortcut icon" href="./static/assets/favicon.png" />
     <style>
-      @font-face {
-        font-family: "Luminari";
-        font-style: normal;
-        font-weight: normal;
-        src: local("Luminari"),
-          url("./static/assets/Luminari-Regular.woff") format("woff");
-      }
-
+      /* IM Fell English (SIL OFL, public domain heritage) — drawn from the
+         1670s type cuts of John Fell. Loaded by main.js via @fontsource. */
       html,
       body {
         margin: 0;
         height: 100%;
         background: #f0dec2;
         overflow: hidden;
-        font-family: "Luminari", "Palatino", "Georgia", serif;
+        font-family: "IM Fell English", "Palatino", "Georgia", serif;
       }
 
       body,
@@ -140,18 +134,6 @@
         );
       }
 
-      /* Compass rose, etched onto the parchment. */
-      #compass {
-        position: absolute;
-        bottom: 36px;
-        right: 36px;
-        width: 100px;
-        height: 100px;
-        pointer-events: none;
-        z-index: 14;
-        opacity: 0.55;
-      }
-
       /* The plate-mark depression: where the copper plate pressed the damp
          rag paper. A thin engraved frame just outside the map area. */
       #plate-mark {
@@ -164,49 +146,6 @@
           inset 0 0 0 1px rgba(245, 222, 184, 0.3),
           inset 0 0 8px rgba(70, 45, 20, 0.28),
           0 0 1px rgba(70, 45, 20, 0.5);
-      }
-
-      /* Cartouche — the engraved title panel in the top-left. */
-      #cartouche {
-        position: absolute;
-        top: 38px;
-        left: 38px;
-        pointer-events: none;
-        z-index: 15;
-        color: #2b1a0a;
-        background: rgba(246, 230, 200, 0.55);
-        border: 1px solid rgba(60, 40, 15, 0.6);
-        box-shadow:
-          inset 0 0 0 1px rgba(246, 230, 200, 0.85),
-          inset 0 0 24px rgba(170, 120, 60, 0.18);
-        padding: 10px 18px 12px 18px;
-        text-align: center;
-        font-family: "Luminari", "Palatino", serif;
-        max-width: 280px;
-      }
-      #cartouche::before,
-      #cartouche::after {
-        content: "❦";
-        display: block;
-        font-size: 14px;
-        color: #6a4a20;
-        line-height: 1;
-        opacity: 0.7;
-      }
-      #cartouche::before { margin-bottom: 4px; }
-      #cartouche::after { margin-top: 4px; }
-      #cartouche .title {
-        font-size: 20px;
-        letter-spacing: 0.18em;
-        font-weight: normal;
-      }
-      #cartouche .sub {
-        margin-top: 2px;
-        font-size: 11px;
-        letter-spacing: 0.32em;
-        opacity: 0.75;
-        font-family: "Palatino", "Georgia", serif;
-        font-style: italic;
       }
 
       /* ── context menu ────────────────────────────────────────────────── */
@@ -270,7 +209,7 @@
         width: 100%;
         box-sizing: border-box;
         padding: 14px 18px;
-        font: 18px "Luminari", "Palatino", serif;
+        font: 18px "IM Fell English", "Palatino", serif;
         background: transparent;
         border: 0;
         border-bottom: 1px solid #b58e54;
@@ -301,7 +240,7 @@
         background: rgba(170, 130, 70, 0.25);
       }
       .search-result .name {
-        font: 17px "Luminari", "Palatino", serif;
+        font: 17px "IM Fell English", "Palatino", serif;
       }
       .search-result .meta {
         font: 12px "Palatino", "Georgia", serif;
@@ -337,7 +276,7 @@
         color: #2b1a0a;
       }
       #loading-card .title {
-        font: 30px "Luminari", "Palatino", serif;
+        font: 30px "IM Fell English", "Palatino", serif;
         letter-spacing: 0.08em;
         margin-bottom: 18px;
       }
@@ -375,40 +314,6 @@
     <div id="torn-top"></div>
     <div id="torn-bottom"></div>
     <div id="plate-mark"></div>
-
-    <div id="cartouche">
-      <div class="title">TABVLA MVNDI</div>
-      <div class="sub">Anno Domini MMXXVI</div>
-    </div>
-
-    <svg id="compass" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <g fill="none" stroke="#2b1a0a" stroke-width="1.2">
-        <circle cx="50" cy="50" r="46" stroke-width="0.6"/>
-        <circle cx="50" cy="50" r="42" />
-        <circle cx="50" cy="50" r="32" />
-        <circle cx="50" cy="50" r="6" stroke-width="0.6"/>
-        <!-- 8 cardinal/ordinal rays -->
-        <g stroke-width="0.5" opacity="0.55">
-          <line x1="50" y1="4" x2="50" y2="46"/>
-          <line x1="50" y1="54" x2="50" y2="96"/>
-          <line x1="4" y1="50" x2="46" y2="50"/>
-          <line x1="54" y1="50" x2="96" y2="50"/>
-          <line x1="18" y1="18" x2="46" y2="46"/>
-          <line x1="54" y1="54" x2="82" y2="82"/>
-          <line x1="82" y1="18" x2="54" y2="46"/>
-          <line x1="18" y1="82" x2="46" y2="54"/>
-        </g>
-        <path d="M50 6 L54 50 L50 94 L46 50 Z" fill="#2b1a0a" />
-        <path d="M6 50 L50 54 L94 50 L50 46 Z" fill="#2b1a0a" opacity="0.6" />
-        <path d="M22 22 L52 48 L78 78 L48 52 Z" fill="#2b1a0a" opacity="0.4" />
-      </g>
-      <g fill="#2b1a0a" font-family="Luminari, Palatino, serif" font-size="9" text-anchor="middle">
-        <text x="50" y="14">N</text>
-        <text x="50" y="92">S</text>
-        <text x="92" y="53">E</text>
-        <text x="8" y="53">W</text>
-      </g>
-    </svg>
 
     <div id="context-menu">
       <div class="item" data-action="coordinates"></div>

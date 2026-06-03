@@ -1,3 +1,7 @@
+import "@fontsource/im-fell-english/400.css";
+import "@fontsource/im-fell-english/400-italic.css";
+import "@fontsource/im-fell-english-sc/400.css";
+
 import VectorLayer from "ol/layer/Vector";
 import VectorImageLayer from "ol/layer/VectorImage";
 import GraticuleLayer from "ol/layer/Graticule";
@@ -29,10 +33,32 @@ const MERCATOR_Y_MAX = 20037508.342789244;
 
 /* ── map ──────────────────────────────────────────────────────────────── */
 
+// Hash format: #z/lat/lon — OSM convention (z first, then lat, then lon).
+function parseHash() {
+  const m = /^#?(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(
+    location.hash,
+  );
+  if (!m) return null;
+  return { zoom: Number(m[1]), lat: Number(m[2]), lon: Number(m[3]) };
+}
+
+const initialHash = parseHash();
+
 const mapElement = document.getElementById("map");
+
+// The world fits the viewport vertically at zoom = log2(viewportHeight / 256)
+// in EPSG:3857. Compute it from the DOM synchronously so the first paint
+// already shows the whole-world view (no zoom-0 flash).
+function viewportFitZoom() {
+  const h = mapElement.clientHeight || window.innerHeight || 800;
+  return Math.log2(h / 256);
+}
+
 const view = new View({
-  center: fromLonLat([2.3522, 48.8566]),
-  zoom: 6,
+  center: initialHash
+    ? fromLonLat([initialHash.lon, initialHash.lat])
+    : fromLonLat([0, 20]),
+  zoom: initialHash ? initialHash.zoom : viewportFitZoom(),
   // Lock the view inside the latitudinal extent of the map; horizontal pan
   // can run freely so the wrapX sources below can repeat the world.
   extent: [-Infinity, -MERCATOR_Y_MAX, Infinity, MERCATOR_Y_MAX],
@@ -58,6 +84,35 @@ function applyMinZoom() {
 }
 map.once("postrender", applyMinZoom);
 window.addEventListener("resize", applyMinZoom);
+
+// Reflect the view in location.hash. Debounced because moveend can fire
+// many times during an animation; we only want one history entry's worth.
+let hashTimer = 0;
+function writeHash() {
+  const center = view.getCenter();
+  const zoom = view.getZoom();
+  if (!center || zoom == null) return;
+  const [lon, lat] = toLonLat(center);
+  const next = `#${zoom.toFixed(2)}/${lat.toFixed(4)}/${lon.toFixed(4)}`;
+  if (next !== location.hash) {
+    history.replaceState(null, "", next);
+  }
+}
+map.on("moveend", () => {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(writeHash, 150);
+});
+
+// Cross-tab / back-button updates: re-sync from the hash.
+window.addEventListener("hashchange", () => {
+  const h = parseHash();
+  if (!h) return;
+  view.animate({
+    center: fromLonLat([h.lon, h.lat]),
+    zoom: h.zoom,
+    duration: 0,
+  });
+});
 
 /* ── background layer ─────────────────────────────────────────────────── */
 
@@ -86,7 +141,7 @@ function backgroundLayerStyle() {
     zIndex: 400,
     text: new Text({
       fill: new Fill({ color: COLOR_INK }),
-      font: 'bold 18px "Luminari"',
+      font: 'bold 18px "IM Fell English"',
     }),
   });
   const glacier = new Style({ zIndex: 500, fill: new Fill({ color: "darkgray" }) });
@@ -145,7 +200,7 @@ const cityShape = new RegularShape({
 const cityTextFill = new Fill({ color: "rgba(0,0,0,1)" });
 const cityTextStroke = new Stroke({ color: "rgba(224,201,166,1)", width: 2 });
 const cityText = new Text({
-  font: 'bold 14px "Luminari"',
+  font: 'bold 14px "IM Fell English"',
   textAlign: "left",
   offsetX: 8,
   offsetY: 2,
