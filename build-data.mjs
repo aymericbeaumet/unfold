@@ -33,16 +33,20 @@ const OUT_DIR = path.join(__dirname, "data");
 const COORD_PRECISION = 3;
 const CITY_COORD_PRECISION = 4;
 
+// `keep` is an optional list of source-property keys to copy through (useful
+// for level-of-detail decisions in the client, e.g. river scale_rank).
 const BACKGROUND_SOURCES = [
-  ["bathymetry_deep", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson"],
-  ["bathymetry_shallow", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_J_1000.geojson"],
-  ["glacier", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson"],
-  ["lake", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson"],
-  ["land", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson"],
-  ["marine", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_geography_marine_polys.geojson"],
-  ["river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_europe.geojson"],
-  ["river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_north_america.geojson"],
-  ["river", "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson"],
+  { class: "bathymetry_deep",    url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_E_6000.geojson" },
+  { class: "bathymetry_shallow", url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_bathymetry_J_1000.geojson" },
+  { class: "glacier",            url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_glaciated_areas.geojson" },
+  { class: "lake",               url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_lakes.geojson" },
+  { class: "land",               url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_land.geojson" },
+  { class: "marine",             url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_geography_marine_polys.geojson" },
+  // Regional high-detail rivers — only rendered at close zoom.
+  { class: "river_detail",       url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_europe.geojson" },
+  { class: "river_detail",       url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_rivers_north_america.geojson" },
+  // Global rivers with scale_rank (1 = Amazon-class, 10 = creek) — LOD-filtered.
+  { class: "river",              url: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_rivers_lake_centerlines_scale_rank.geojson", keep: ["scalerank"] },
 ];
 
 const CITIES_URL = "https://download.geonames.org/export/dump/cities500.zip";
@@ -84,15 +88,20 @@ function titleCase(s) {
 
 async function buildBackground() {
   const features = [];
-  for (const [featureClass, url] of BACKGROUND_SOURCES) {
-    const filePath = await downloadCached(url);
+  for (const source of BACKGROUND_SOURCES) {
+    const filePath = await downloadCached(source.url);
     const fc = JSON.parse(await fs.readFile(filePath, "utf8"));
     for (const feature of fc.features) {
-      const properties = { featureClass };
+      const properties = { featureClass: source.class };
       const rawName = feature.properties?.name;
       if (typeof rawName === "string") {
         const name = titleCase(rawName);
         if (name) properties.name = name;
+      }
+      for (const key of source.keep || []) {
+        if (feature.properties?.[key] !== undefined) {
+          properties[key] = feature.properties[key];
+        }
       }
       feature.properties = properties;
       if (feature.geometry?.coordinates) {

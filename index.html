@@ -102,38 +102,6 @@
         );
       }
 
-      /* Torn paper edges along top and bottom. */
-      #torn-top,
-      #torn-bottom {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 24px;
-        pointer-events: none;
-        z-index: 13;
-        background: #f0dec2;
-      }
-      #torn-top {
-        top: 0;
-        clip-path: polygon(
-          0 0, 100% 0, 100% 60%,
-          97% 100%, 94% 50%, 91% 100%, 87% 60%, 83% 100%, 79% 55%, 75% 100%,
-          71% 65%, 67% 100%, 62% 50%, 58% 100%, 54% 70%, 50% 100%, 46% 55%,
-          42% 100%, 38% 65%, 33% 100%, 29% 50%, 25% 100%, 21% 70%, 17% 100%,
-          13% 55%, 9% 100%, 5% 65%, 2% 100%, 0 60%
-        );
-      }
-      #torn-bottom {
-        bottom: 0;
-        clip-path: polygon(
-          0 100%, 100% 100%, 100% 40%,
-          97% 0, 94% 50%, 91% 0, 87% 40%, 83% 0, 79% 45%, 75% 0, 71% 35%,
-          67% 0, 62% 50%, 58% 0, 54% 30%, 50% 0, 46% 45%, 42% 0, 38% 35%,
-          33% 0, 29% 50%, 25% 0, 21% 30%, 17% 0, 13% 45%, 9% 0, 5% 35%,
-          2% 0, 0 40%
-        );
-      }
-
       /* The plate-mark depression: where the copper plate pressed the damp
          rag paper. A thin engraved frame just outside the map area. */
       #plate-mark {
@@ -311,8 +279,6 @@
 
     <div id="vignette"></div>
     <div id="sun"></div>
-    <div id="torn-top"></div>
-    <div id="torn-bottom"></div>
     <div id="plate-mark"></div>
 
     <div id="context-menu">

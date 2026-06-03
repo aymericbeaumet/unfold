@@ -18,12 +18,16 @@ import CITIES_URL from "url:./data/cities.bin";
 
 /* ── theme ─────────────────────────────────────────────────────────────── */
 
-const COLOR_GRATICULE = "#5E5E5E";
-const COLOR_INK = "#000000";
+// Period-correct palette: every tone is a tea-stained variation of the
+// rag-paper base. No blues, greys, or saturated colours — those don't exist
+// in pre-1850 hand-coloured engravings.
+const COLOR_INK = "#1d1206";
 const COLOR_LAND = "#E0C9A6";
 const COLOR_WATER = "#F0DEC2";
 const COLOR_WATER_SHALLOW = "#D6C6AB";
 const COLOR_WATER_DEEP = "#BDAE97";
+const COLOR_GLACIER = "#F1E4C7";  // bone-white parchment, very slightly lighter than water
+const COLOR_GRATICULE = "#7A5A2E"; // burnt umber, the ink graticules were drawn in
 
 const MAX_VISIBLE_CITIES = 100;
 const CITY_FADE_MS = 350;
@@ -33,13 +37,14 @@ const MERCATOR_Y_MAX = 20037508.342789244;
 
 /* ── map ──────────────────────────────────────────────────────────────── */
 
-// Hash format: #z/lat/lon — OSM convention (z first, then lat, then lon).
+// Hash format mirrors Google Maps: #@lat,lon,zoomz (lat first, comma-separated,
+// trailing 'z' on the zoom). Copy a Google Maps URL into here and it just works.
 function parseHash() {
-  const m = /^#?(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(
+  const m = /^#?@?(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)z?$/.exec(
     location.hash,
   );
   if (!m) return null;
-  return { zoom: Number(m[1]), lat: Number(m[2]), lon: Number(m[3]) };
+  return { lat: Number(m[1]), lon: Number(m[2]), zoom: Number(m[3]) };
 }
 
 const initialHash = parseHash();
@@ -93,7 +98,7 @@ function writeHash() {
   const zoom = view.getZoom();
   if (!center || zoom == null) return;
   const [lon, lat] = toLonLat(center);
-  const next = `#${zoom.toFixed(2)}/${lat.toFixed(4)}/${lon.toFixed(4)}`;
+  const next = `#@${lat.toFixed(7)},${lon.toFixed(7)},${zoom.toFixed(1)}z`;
   if (next !== location.hash) {
     history.replaceState(null, "", next);
   }
@@ -144,7 +149,11 @@ function backgroundLayerStyle() {
       font: 'bold 18px "IM Fell English"',
     }),
   });
-  const glacier = new Style({ zIndex: 500, fill: new Fill({ color: "darkgray" }) });
+  const glacier = new Style({
+    zIndex: 500,
+    fill: new Fill({ color: COLOR_GLACIER }),
+    stroke: new Stroke({ color: COLOR_INK, width: 0.6 }),
+  });
   const river = new Style({ zIndex: 600, stroke: new Stroke({ color: COLOR_INK, width: 1 }) });
   const lake = new Style({
     zIndex: 700,
@@ -152,7 +161,25 @@ function backgroundLayerStyle() {
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
 
-  return function (feature) {
+  // Resolution thresholds in EPSG:3857 m/px. A river is rendered only when the
+  // current resolution is below the threshold for its scale rank — that keeps
+  // the world view to a handful of Amazon-class arteries, not a noisy mesh.
+  // (NaturalEarth scalerank: 1 ≈ Mississippi, 10 ≈ creek.)
+  const RIVER_THRESHOLDS = [
+    /* rank 1 */ Infinity,
+    /* rank 2 */ Infinity,
+    /* rank 3 */ 20000,
+    /* rank 4 */ 12000,
+    /* rank 5 */  6000,
+    /* rank 6 */  3000,
+    /* rank 7 */  1500,
+    /* rank 8 */   800,
+    /* rank 9 */   400,
+    /* rank 10*/   200,
+  ];
+  const RIVER_DETAIL_MAX_RES = 1500; // ne_10m regional rivers — only at close zoom
+
+  return function (feature, resolution) {
     switch (feature.get("featureClass")) {
       case "bathymetry_deep": return bathymetry_deep;
       case "bathymetry_shallow": return bathymetry_shallow;
@@ -162,7 +189,13 @@ function backgroundLayerStyle() {
       case "marine":
         marine.getText().setText(feature.get("name"));
         return marine;
-      case "river": return river;
+      case "river": {
+        const rank = feature.get("scalerank") ?? 5;
+        const threshold = RIVER_THRESHOLDS[Math.min(rank, RIVER_THRESHOLDS.length - 1)];
+        return resolution <= threshold ? river : null;
+      }
+      case "river_detail":
+        return resolution <= RIVER_DETAIL_MAX_RES ? river : null;
     }
   };
 }
