@@ -4,7 +4,7 @@ import GraticuleLayer from "ol/layer/Graticule";
 import VectorSource from "ol/source/Vector";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
-import { Fill, Icon, Style, RegularShape, Text, Stroke } from "ol/style";
+import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
 import { GeoJSON } from "ol/format";
 import { View, Map } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
@@ -194,92 +194,6 @@ const featuresLayer = new VectorLayer({
   style: featuresLayerStyle,
 });
 map.addLayer(featuresLayer);
-
-/* ── horror vacui: sea monsters & tall ships ──────────────────────────── */
-
-const SHIP_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'>
-  <g fill='none' stroke='#3a2410' stroke-width='1.2' stroke-linecap='round'>
-    <path d='M8 42 L52 42 L46 50 L14 50 Z' fill='#5a3a1a'/>
-    <line x1='30' y1='10' x2='30' y2='42'/>
-    <line x1='20' y1='20' x2='20' y2='42'/>
-    <line x1='40' y1='20' x2='40' y2='42'/>
-    <path d='M30 12 Q25 25 30 36 Q35 25 30 12' fill='#f0dec2'/>
-    <path d='M20 22 Q16 32 20 40 Q24 32 20 22' fill='#f0dec2'/>
-    <path d='M40 22 Q36 32 40 40 Q44 32 40 22' fill='#f0dec2'/>
-    <path d='M30 6 L28 12 L32 12 Z' fill='#3a2410'/>
-  </g>
-</svg>`;
-
-const MONSTER_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 50'>
-  <g fill='#7a4a20' stroke='#3a2410' stroke-width='1' stroke-linecap='round'>
-    <path d='M4 32 Q14 18 24 32 Q34 46 44 32 Q54 18 64 32' fill='none' stroke-width='1.6'/>
-    <ellipse cx='74' cy='30' rx='10' ry='7'/>
-    <path d='M78 22 L84 18 L82 26 Z'/>
-    <path d='M80 33 L86 31 L83 38 Z'/>
-    <circle cx='78' cy='28' r='1.2' fill='#000'/>
-    <path d='M72 36 Q78 42 80 36' fill='none' stroke-width='1'/>
-  </g>
-</svg>`;
-
-const KRAKEN_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'>
-  <g fill='#5a3a1a' stroke='#3a2410' stroke-width='1' stroke-linecap='round'>
-    <ellipse cx='40' cy='40' rx='14' ry='12'/>
-    <path d='M28 36 Q12 28 8 12'  fill='none' stroke-width='1.6'/>
-    <path d='M36 28 Q26 14 32 4'  fill='none' stroke-width='1.6'/>
-    <path d='M52 28 Q66 18 72 8'  fill='none' stroke-width='1.6'/>
-    <path d='M54 44 Q70 50 74 64' fill='none' stroke-width='1.6'/>
-    <path d='M44 54 Q48 70 60 76' fill='none' stroke-width='1.6'/>
-    <path d='M30 52 Q20 64 14 74' fill='none' stroke-width='1.6'/>
-    <circle cx='34' cy='38' r='1.5' fill='#000'/>
-    <circle cx='46' cy='38' r='1.5' fill='#000'/>
-  </g>
-</svg>`;
-
-function svgIcon(svg, scale) {
-  return new Icon({
-    src: "data:image/svg+xml;utf8," + encodeURIComponent(svg),
-    scale,
-    opacity: 0.85,
-    anchor: [0.5, 0.5],
-  });
-}
-
-const shipStyle = new Style({ image: svgIcon(SHIP_SVG, 0.9) });
-const monsterStyle = new Style({ image: svgIcon(MONSTER_SVG, 1.0) });
-const krakenStyle = new Style({ image: svgIcon(KRAKEN_SVG, 0.95) });
-
-// Hand-picked ocean coordinates so the decorations don't fall on land.
-const DECORATIONS = [
-  ["ship",    -35,  28],   // mid Atlantic
-  ["ship",     75, -12],   // Indian Ocean
-  ["ship",   -135, -38],   // South Pacific
-  ["monster", -25, -32],   // South Atlantic
-  ["monster", 175,  10],   // Pacific
-  ["monster", -55,  -8],   // off South America
-  ["kraken", -150,  40],   // North Pacific
-  ["kraken",   55, -42],   // Southern Indian Ocean
-];
-
-const decorationsSource = new VectorSource({ wrapX: true });
-for (const [kind, lon, lat] of DECORATIONS) {
-  const f = new Feature({
-    geometry: new Point(fromLonLat([lon, lat])),
-    featureClass: kind,
-  });
-  decorationsSource.addFeature(f);
-}
-
-const decorationsLayer = new VectorLayer({
-  source: decorationsSource,
-  style: (feature) => {
-    switch (feature.get("featureClass")) {
-      case "ship": return shipStyle;
-      case "monster": return monsterStyle;
-      case "kraken": return krakenStyle;
-    }
-  },
-});
-map.addLayer(decorationsLayer);
 
 /* ── cities worker ────────────────────────────────────────────────────── */
 

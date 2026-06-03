@@ -77,17 +77,6 @@
         );
       }
 
-      /* Hand-painted oxidation: a handful of foxing blots scattered over the
-         page. Drawn once as an SVG so positions stay consistent on resize. */
-      #age-spots {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        z-index: 11;
-        mix-blend-mode: multiply;
-        opacity: 0.55;
-      }
-
       /* Soft brown vignette around the edges. */
       #vignette {
         position: absolute;
@@ -380,27 +369,6 @@
 
     <div id="paper"></div>
     <div id="wire-lines"></div>
-
-    <svg id="age-spots" preserveAspectRatio="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="rough">
-          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="3"/>
-          <feDisplacementMap in="SourceGraphic" scale="3"/>
-        </filter>
-      </defs>
-      <g fill="#7a4a20" filter="url(#rough)" opacity="0.55">
-        <ellipse cx="14" cy="22" rx="2.4" ry="1.4"/>
-        <ellipse cx="28" cy="9"  rx="1.6" ry="1.0"/>
-        <ellipse cx="63" cy="18" rx="2.0" ry="1.2"/>
-        <ellipse cx="86" cy="14" rx="2.8" ry="1.6"/>
-        <ellipse cx="42" cy="56" rx="1.4" ry="0.9"/>
-        <ellipse cx="78" cy="48" rx="2.2" ry="1.3"/>
-        <ellipse cx="11" cy="71" rx="1.8" ry="1.1"/>
-        <ellipse cx="49" cy="82" rx="2.6" ry="1.5"/>
-        <ellipse cx="82" cy="88" rx="1.5" ry="0.9"/>
-        <ellipse cx="34" cy="38" rx="0.9" ry="0.6"/>
-      </g>
-    </svg>
 
     <div id="vignette"></div>
     <div id="sun"></div>
