@@ -21,25 +21,37 @@ npm install
 npm run dev              # http://localhost:9191
 ```
 
-`data/background.geojson` and `data/cities.bin` are committed, so cloning the
+`data/background.pmtiles` and `data/cities.bin` are committed, so cloning the
 repo is enough to run the site. Regenerate them whenever you want to pick up
-fresh upstream data:
+fresh upstream data — this needs [`tippecanoe`](https://github.com/felt/tippecanoe)
+on `PATH`:
 
 ```sh
-npm run build-data       # ~30 MB download, cached in .data-cache/
+brew install tippecanoe   # or apt-get install tippecanoe on Ubuntu
+npm run build-data        # ~30 MB download, cached in .data-cache/
 git add data && git commit -m "refresh data"
 ```
 
+CI does not need tippecanoe — `.github/workflows/deploy.yml` consumes the
+committed `data/background.pmtiles` directly.
+
 `build-data` produces two files in `data/`:
 
-- `background.geojson` — merged NaturalEarth layers (land, lakes, rivers,
-  bathymetry, glaciers, marine labels), with coordinates trimmed to 3 decimals.
+- `background.pmtiles` — NaturalEarth layers (land, lakes, rivers,
+  bathymetry, glaciers, marine labels) baked into a [PMTiles](https://docs.protomaps.com/pmtiles/)
+  vector-tile archive by tippecanoe. Per-class MVT layers, per-zoom
+  simplification, per-feature `tippecanoe.minzoom` baked in (so e.g.
+  low-rank rivers and regional river_detail are physically omitted from
+  low-zoom tiles). The browser fetches tiles via HTTP byte-range requests
+  from a single archive — no per-tile DNS, no runtime reprojection, no
+  multi-megabyte `JSON.parse` on the main thread.
 - `cities.bin` — every GeoNames city ≥500 inhabitants, packed binary,
   pre-sorted by a score that boosts capitals (+1B) and district capitals
-  (+100M) over raw population. Layout: `u32 count`, `f32[count] lons`,
-  `f32[count] lats`, `u32[count+1]` cumulative name offsets, `u8[…]` utf-8
-  name bytes. ~5 MB vs ~7 MB JSON, and parses for free (TypedArray views
-  over the fetched buffer).
+  (+100M) over raw population. Coordinates are pre-projected to EPSG:3857
+  metres so neither the worker bbox scan nor the main-thread feature
+  construction has to call `fromLonLat`. Layout: `u32 count`,
+  `f32[count] xs`, `f32[count] ys`, `u32[count]` populations,
+  `u8[count*2]` country codes, name+search offset/byte sections.
 
 Re-run `npm run build-data` whenever you want to refresh the upstream data;
 the `.data-cache/` directory makes repeat runs free.

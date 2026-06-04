@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@fontsource/im-fell-english": "^5.2.6",
-    "@fontsource/im-fell-english-sc": "^5.2.6",
-    "ol": "^10.9.0"
+    "ol": "^10.9.0",
+    "pmtiles": "^4.3.0"
   },
   "devDependencies": {
     "jszip": "^3.10.1",

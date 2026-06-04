@@ -1,70 +1,90 @@
 // Owns the cities.bin ArrayBuffer (transferred zero-copy from the main thread)
 // and answers two query types:
-//   - bbox: top-N highest-scored cities inside a lon/lat rectangle
+//   - bbox: top-N highest-scored cities inside a Mercator rectangle
 //   - search: top-N cities matching a normalized text query
+//
+// Coordinates ship pre-projected to EPSG:3857 (Web Mercator metres); the
+// view extent the main thread sends is already in those units too. Each
+// city ships TWO strings, both baked at build time:
+//   - `name`    : just the city ("Paris"), used by the on-map label
+//   - `display` : the formatted search palette row ("🇫🇷 Paris, France")
 //
 // Wire protocol:
 //   ← { type: "init", buffer: ArrayBuffer }        (buffer is transferred)
 //   → { type: "ready" }
-//   ← { type: "query", id, minLon, minLat, maxLon, maxLat, limit? }
-//   → { type: "result", id, cities: [{ name, country, lon, lat, population }, ...] }
+//   ← { type: "query", id, minX, minY, maxX, maxY, limit? }
+//   → { type: "result", id, cities: [{ name, x, y, population }, ...] }
 //   ← { type: "search", id, q, limit? }
-//   → { type: "search-result", id, cities: [...] }
+//   → { type: "search-result", id, cities: [{ display, x, y, population }, ...] }
 
-const HEADER_FIELDS = 10;
+const HEADER_FIELDS = 11;
 const DEFAULT_BBOX_LIMIT = 100;
 const DEFAULT_SEARCH_LIMIT = 12;
 const decoder = new TextDecoder();
 
+// 2 × π × earthRadius — the full horizontal span of the Web Mercator world.
+const MERCATOR_WORLD = 2 * Math.PI * 6378137;
+
 let count = 0;
-let lons, lats, pops, countries;
-let nameOffsets, names, searchOffsets, searches;
+let xs, ys, pops;
+let nameOffsets, names, displayOffsets, displays, searchOffsets, searches;
 
 function init(buffer) {
   const h = new Uint32Array(buffer, 0, HEADER_FIELDS);
   count = h[0];
-  lons = new Float32Array(buffer, h[1], count);
-  lats = new Float32Array(buffer, h[2], count);
+  xs = new Float32Array(buffer, h[1], count);
+  ys = new Float32Array(buffer, h[2], count);
   pops = new Uint32Array(buffer, h[3], count);
-  countries = new Uint8Array(buffer, h[4], count * 2);
-  nameOffsets = new Uint32Array(buffer, h[5], count + 1);
-  names = new Uint8Array(buffer, h[6]);
-  searchOffsets = new Uint32Array(buffer, h[7], count + 1);
-  searches = new Uint8Array(buffer, h[8]);
+  nameOffsets = new Uint32Array(buffer, h[4], count + 1);
+  names = new Uint8Array(buffer, h[5]);
+  displayOffsets = new Uint32Array(buffer, h[6], count + 1);
+  displays = new Uint8Array(buffer, h[7]);
+  searchOffsets = new Uint32Array(buffer, h[8], count + 1);
+  searches = new Uint8Array(buffer, h[9]);
 }
 
 function nameAt(i) {
   return decoder.decode(names.subarray(nameOffsets[i], nameOffsets[i + 1]));
 }
 
-function countryAt(i) {
-  return String.fromCharCode(countries[i * 2]) + String.fromCharCode(countries[i * 2 + 1]);
+function displayAt(i) {
+  return decoder.decode(displays.subarray(displayOffsets[i], displayOffsets[i + 1]));
 }
 
-function row(i) {
+// bbox results need the plain `name` for the on-map label; search results
+// need the formatted `display` for the palette row. Separate row builders
+// keep each payload minimal.
+function bboxRow(i) {
   return {
     name: nameAt(i),
-    country: countryAt(i),
-    lon: lons[i],
-    lat: lats[i],
+    x: xs[i],
+    y: ys[i],
+    population: pops[i],
+  };
+}
+function searchRow(i) {
+  return {
+    display: displayAt(i),
+    x: xs[i],
+    y: ys[i],
     population: pops[i],
   };
 }
 
-// Handles antimeridian wrap: if the requested span exceeds 360° (the user has
-// zoomed all the way out and the map repeats horizontally), every city is
-// visible somewhere. Otherwise a city at canonical lon L is in-bbox iff
-// (L − minLon) mod 360 ≤ span.
-function bboxQuery(minLon, minLat, maxLon, maxLat, limit) {
-  const span = Math.min(360, maxLon - minLon);
+// Handles antimeridian wrap: if the requested span exceeds the full Mercator
+// world width (the user is zoomed out and the map repeats horizontally),
+// every city is visible somewhere. Otherwise a city at canonical X is
+// in-bbox iff (X − minX) mod WORLD ≤ span.
+function bboxQuery(minX, minY, maxX, maxY, limit) {
+  const span = Math.min(MERCATOR_WORLD, maxX - minX);
   const out = [];
   for (let i = 0; i < count && out.length < limit; i++) {
-    const lat = lats[i];
-    if (lat < minLat || lat > maxLat) continue;
-    const lon = lons[i];
-    let delta = (lon - minLon) % 360;
-    if (delta < 0) delta += 360;
-    if (delta <= span) out.push(row(i));
+    const y = ys[i];
+    if (y < minY || y > maxY) continue;
+    const x = xs[i];
+    let delta = (x - minX) % MERCATOR_WORLD;
+    if (delta < 0) delta += MERCATOR_WORLD;
+    if (delta <= span) out.push(bboxRow(i));
   }
   return out;
 }
@@ -101,7 +121,7 @@ function searchQuery(query, limit) {
         break;
       }
     }
-    if (allMatch) out.push(row(i));
+    if (allMatch) out.push(searchRow(i));
   }
   return out;
 }
@@ -139,7 +159,7 @@ self.onmessage = (event) => {
       break;
     case "query": {
       const cities = bboxQuery(
-        msg.minLon, msg.minLat, msg.maxLon, msg.maxLat,
+        msg.minX, msg.minY, msg.maxX, msg.maxY,
         msg.limit || DEFAULT_BBOX_LIMIT,
       );
       self.postMessage({ type: "result", id: msg.id, cities });

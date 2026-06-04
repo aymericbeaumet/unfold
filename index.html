@@ -3,15 +3,34 @@
   <head>
     <meta charset="utf-8" />
     <title>World Map</title>
-    <link
-      rel="stylesheet"
-      href="https://openlayers.org/en/latest/css/ol.css"
-      type="text/css"
-    />
     <link rel="shortcut icon" href="./static/assets/favicon.png" />
+
+    <!-- Preload the first-paint font so the loading title renders in IM Fell
+         immediately, not in a fallback. Data files (background.pmtiles,
+         cities.bin) are fetched from main.js as soon as its module body runs
+         — preloading them from HTML doesn't help here because Parcel's HTML
+         and JS asset pipelines emit different hashed copies, which would just
+         double-download. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./static/fonts/im-fell-english-400.woff2"
+      crossorigin
+    />
+
     <style>
       /* IM Fell English (SIL OFL, public domain heritage) — drawn from the
-         1670s type cuts of John Fell. Loaded by main.js via @fontsource. */
+         1670s type cuts of John Fell. The 400-normal weight is declared here
+         (not via @fontsource) so the browser can preload it from index.html
+         and the first-paint title font doesn't wait on main.js to parse. */
+      @font-face {
+        font-family: "IM Fell English";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url("./static/fonts/im-fell-english-400.woff2") format("woff2");
+      }
       html,
       body {
         margin: 0;

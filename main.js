@@ -1,20 +1,28 @@
-import "@fontsource/im-fell-english/400.css";
+// The 400 normal weight is declared inline in index.html so it can be
+// rel=preloaded before the JS bundle parses. Italics is the only variant
+// still loaded via @fontsource (used by the loading-overlay status line).
 import "@fontsource/im-fell-english/400-italic.css";
-import "@fontsource/im-fell-english-sc/400.css";
 
 import VectorLayer from "ol/layer/Vector";
-import VectorImageLayer from "ol/layer/VectorImage";
-import GraticuleLayer from "ol/layer/Graticule";
+import VectorTileLayer from "ol/layer/VectorTile";
 import VectorSource from "ol/source/Vector";
+import VectorTileSource from "ol/source/VectorTile";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
-import { Fill, Style, RegularShape, Text, Stroke } from "ol/style";
-import { GeoJSON } from "ol/format";
-import { View, Map } from "ol";
+import { Fill, Style, RegularShape, Text, Stroke, Circle as CircleStyle } from "ol/style";
+import { MVT } from "ol/format";
+// Aliased so the global `Map` (used for diffing visible cities below) isn't
+// shadowed by OL's `Map` class.
+import { View, Map as OLMap } from "ol";
 import { fromLonLat, toLonLat } from "ol/proj";
+import { PMTiles } from "pmtiles";
 
-import BACKGROUND_URL from "url:./data/background.geojson";
-import CITIES_URL from "url:./data/cities.bin";
+// `new URL(..., import.meta.url)` shares Parcel's asset pipeline with the
+// `<link rel=preload>` tags in index.html, so the preload hash matches the
+// runtime fetch hash and the browser de-dupes — the import.meta form is what
+// Parcel statically rewrites to the same hashed path the HTML references.
+const BACKGROUND_URL = new URL("./data/background.pmtiles", import.meta.url).href;
+const CITIES_URL = new URL("./data/cities.bin", import.meta.url).href;
 
 /* ── theme ─────────────────────────────────────────────────────────────── */
 
@@ -27,13 +35,16 @@ const COLOR_WATER = "#F0DEC2";
 const COLOR_WATER_SHALLOW = "#D6C6AB";
 const COLOR_WATER_DEEP = "#BDAE97";
 const COLOR_GLACIER = "#F1E4C7";  // bone-white parchment, very slightly lighter than water
-const COLOR_GRATICULE = "#7A5A2E"; // burnt umber, the ink graticules were drawn in
+const COLOR_URBAN = "#C6A87C";    // built-up areas — a notch darker than land
+const COLOR_ROAD = "#6B3F18";     // warm sepia line, distinct from the cooler ink of rivers
 
-const MAX_VISIBLE_CITIES = 100;
+const MAX_VISIBLE_CITIES = 300;
 const CITY_FADE_MS = 350;
 
 // Web Mercator vertical extent (meters).
 const MERCATOR_Y_MAX = 20037508.342789244;
+// Full horizontal span of one Web Mercator world (2 × π × earthRadius).
+const MERCATOR_WORLD = 2 * Math.PI * 6378137;
 
 /* ── map ──────────────────────────────────────────────────────────────── */
 
@@ -73,7 +84,7 @@ const view = new View({
   smoothResolutionConstraint: false,
 });
 
-const map = new Map({
+const map = new OLMap({
   target: mapElement,
   controls: [],
   view,
@@ -124,6 +135,11 @@ window.addEventListener("hashchange", () => {
 
 /* ── background layer ─────────────────────────────────────────────────── */
 
+// All styles are constructed once and reused. The style function dispatches
+// on the MVT layer name (`feature.get('featureClass')` is set by MVT's
+// `layerName` option below) — no string switching on a property, no per-zoom
+// resolution checks (river LOD is baked into the tile contents via
+// per-feature tippecanoe.minzoom).
 function backgroundLayerStyle() {
   const bathymetry_shallow = new Style({
     zIndex: 100,
@@ -145,8 +161,41 @@ function backgroundLayerStyle() {
     new Style({ zIndex: 309, stroke: new Stroke({ color: COLOR_INK, width: 3 }) }),
     new Style({ zIndex: 310, fill: new Fill({ color: COLOR_LAND }) }),
   ];
+  // Marine labels: with wrapX=true the source renders into every world copy
+  // intersecting the viewport, which made labels like "Arctic Ocean" appear
+  // twice near z=1. The geometry function pulls the label into the world
+  // copy nearest view center on every wrapped rendering, so they all land at
+  // the same absolute position and declutter dedupes them down to one.
+  const marinePoint = new Point([0, 0]);
   const marine = new Style({
     zIndex: 400,
+    geometry: (feature) => {
+      // Use the polygon's INTERIOR POINT (always inside the water body) so
+      // a Mediterranean-style label can't end up sitting on land just
+      // because the polygon's axis-aligned bbox midpoint happens to fall on
+      // a peninsula. Polygon and MultiPolygon expose different methods, and
+      // MVT can hand us either, so handle both with a fall-back to the
+      // extent centroid.
+      const geom = feature.getGeometry();
+      let fx, fy;
+      if (typeof geom.getInteriorPoint === "function") {
+        const p = geom.getInteriorPoint().getCoordinates();
+        fx = p[0]; fy = p[1];
+      } else if (typeof geom.getInteriorPoints === "function") {
+        const flat = geom.getInteriorPoints().getFlatCoordinates();
+        fx = flat[0]; fy = flat[1];
+      } else {
+        const [minX, minY, maxX, maxY] = geom.getExtent();
+        fx = (minX + maxX) / 2; fy = (minY + maxY) / 2;
+      }
+      const viewCenter = view.getCenter();
+      const cx = viewCenter ? viewCenter[0] : 0;
+      // Snap fx to the world-copy translation that minimises distance to cx
+      // — same dedup trick that stops "Arctic Ocean" from showing twice.
+      const shifts = Math.round((cx - fx) / MERCATOR_WORLD);
+      marinePoint.setCoordinates([fx + shifts * MERCATOR_WORLD, fy]);
+      return marinePoint;
+    },
     text: new Text({
       fill: new Fill({ color: COLOR_INK }),
       font: 'bold 18px "IM Fell English"',
@@ -163,26 +212,69 @@ function backgroundLayerStyle() {
     fill: new Fill({ color: COLOR_WATER }),
     stroke: new Stroke({ color: COLOR_INK, width: 1 }),
   });
-
-  // Resolution thresholds in EPSG:3857 m/px. A river is rendered only when the
-  // current resolution is below the threshold for its scale rank — that keeps
-  // the world view to a handful of Amazon-class arteries, not a noisy mesh.
-  // (NaturalEarth scalerank: 1 ≈ Mississippi, 10 ≈ creek.)
-  const RIVER_THRESHOLDS = [
-    /* rank 1 */ Infinity,
-    /* rank 2 */ Infinity,
-    /* rank 3 */ 20000,
-    /* rank 4 */ 12000,
-    /* rank 5 */  6000,
-    /* rank 6 */  3000,
-    /* rank 7 */  1500,
-    /* rank 8 */   800,
-    /* rank 9 */   400,
-    /* rank 10*/   200,
+  // Drawable city footprint — a darker tea-stain over the land so users can
+  // see where to colour their towns. Light ink outline so it reads as a
+  // delineation, not a smudge.
+  const urban_area = new Style({
+    zIndex: 750,
+    fill: new Fill({ color: COLOR_URBAN }),
+    stroke: new Stroke({ color: COLOR_INK, width: 0.5 }),
+  });
+  // Old-road style: a thin double line — a darker carriageway base with a
+  // slightly lighter centerline gives the engraved post-road look.
+  const road = [
+    new Style({ zIndex: 800, stroke: new Stroke({ color: COLOR_ROAD, width: 1.6 }) }),
+    new Style({ zIndex: 801, stroke: new Stroke({ color: COLOR_WATER, width: 0.5, lineDash: [4, 3] }) }),
   ];
-  const RIVER_DETAIL_MAX_RES = 1500; // ne_10m regional rivers — only at close zoom
+  // Sea route (NaturalEarth ferries) — period-style dashed sepia, thinner
+  // than a road and drawn over the water without a centerline. Renders just
+  // below the road layer so coastal roads draw cleanly over the dashes.
+  const seaRoute = new Style({
+    zIndex: 780,
+    stroke: new Stroke({ color: COLOR_ROAD, width: 1, lineDash: [3, 4] }),
+  });
+  // Mountain peaks: upward-pointing triangle (the period-correct mountain
+  // pictograph) tinted by elevation. The colour ramps from warm-sand at sea
+  // level to near-black at 8000 m+ — the visual cue that "darker = higher"
+  // mimics the engraved hachure-shading of antique maps. Triangle radius
+  // also grows with elevation so a Himalayan giant overshadows a foothill.
+  // Styles are cached per 1 km elevation tier so the style function isn't
+  // re-allocating on every tile render.
+  const PEAK_LABEL_MIN_ZOOM = 5;
+  const peakStyleCache = new Map();
+  function peakDotStyle(elev) {
+    const tier = Math.max(0, Math.min(8, Math.floor((elev || 0) / 1000)));
+    const cached = peakStyleCache.get(tier);
+    if (cached) return cached;
+    // Linear ramp from #C6A87C (warm tan) at tier 0 to #1d1206 (ink) at tier 8.
+    const t = tier / 8;
+    const lerp = (a, b) => Math.round(a + (b - a) * t);
+    const fill = new Fill({
+      color: `rgb(${lerp(0xC6, 0x1d)}, ${lerp(0xA8, 0x12)}, ${lerp(0x7C, 0x06)})`,
+    });
+    const stroke = new Stroke({ color: COLOR_LAND, width: 0.5 });
+    const shape = new RegularShape({
+      points: 3,
+      radius: 5 + tier * 0.7,             // 5 px at sea level → ~10.6 px at 8 km
+      angle: 0,
+      fill,
+      stroke,
+    });
+    const style = new Style({
+      // Higher peaks paint over shorter neighbours.
+      zIndex: 850 + tier,
+      image: shape,
+      declutterMode: "none",
+    });
+    peakStyleCache.set(tier, style);
+    return style;
+  }
+  // Label fill/stroke are shared (one Fill per ramp tier would be overkill);
+  // text content is per-feature so OL declutter sees each name distinctly.
+  const peakLabelFill = new Fill({ color: COLOR_INK });
+  const peakLabelStroke = new Stroke({ color: COLOR_LAND, width: 2 });
 
-  return function (feature, resolution) {
+  return function (feature) {
     switch (feature.get("featureClass")) {
       case "bathymetry_deep": return bathymetry_deep;
       case "bathymetry_shallow": return bathymetry_shallow;
@@ -192,62 +284,159 @@ function backgroundLayerStyle() {
       case "marine":
         marine.getText().setText(feature.get("name"));
         return marine;
-      case "river": {
-        const rank = feature.get("scalerank") ?? 5;
-        const threshold = RIVER_THRESHOLDS[Math.min(rank, RIVER_THRESHOLDS.length - 1)];
-        return resolution <= threshold ? river : null;
-      }
+      case "river":
       case "river_detail":
-        return resolution <= RIVER_DETAIL_MAX_RES ? river : null;
+        return river;
+      case "urban_area": return urban_area;
+      case "road": return road;
+      case "sea_route": return seaRoute;
+      case "peak": {
+        const elev = feature.get("elevation") || 0;
+        const dot = peakDotStyle(elev);
+        if (view.getZoom() < PEAK_LABEL_MIN_ZOOM) return dot;
+        const name = feature.get("name") || "";
+        // Per-feature Text so each peak's label keeps its own string
+        // through declutter (same reason as the city labels above).
+        const text = new Text({
+          font: 'italic 11px "IM Fell English"',
+          textAlign: "left",
+          offsetX: 9,
+          offsetY: 1,
+          fill: peakLabelFill,
+          stroke: peakLabelStroke,
+          text: elev ? `${name} · ${elev} m` : name,
+        });
+        return [dot, new Style({ zIndex: 851, text })];
+      }
     }
   };
 }
 
-const backgroundSource = new VectorSource({
-  format: new GeoJSON(),
-  url: BACKGROUND_URL,
-  wrapX: true,
-});
+// PMTiles archive — a single HTTP fetch with byte-range requests for tile
+// data. The MVT layer name is exposed to the style function via the
+// `layerName: "featureClass"` option, matching the legacy property name.
+const pmtilesArchive = new PMTiles(BACKGROUND_URL);
 
-// imageRatio: 3 keeps the rasterised cache pre-scaled, so the layer doesn't
-// have to re-vectorize on every zoom step — pan/zoom feels much smoother
-// at the cost of some VRAM. declutter keeps marine labels from overlapping.
-const backgroundLayer = new VectorImageLayer({
+// One factory, two sources: the main background wraps horizontally so the
+// world repeats during pan, while marine labels live on a non-wrapping
+// source so we can place them in exactly one world copy (the one nearest
+// view center, picked by the marine style's geometry override).
+function makeBackgroundSource(wrapX) {
+  const src = new VectorTileSource({
+    format: new MVT({ layerName: "featureClass" }),
+    url: "{z}/{x}/{y}",
+    wrapX,
+    // Must match the tippecanoe `-z` in build-data.mjs — OL will overzoom
+    // past this by upscaling z10 tiles, which keeps the texture present
+    // even at street-level zooms.
+    maxZoom: 10,
+  });
+  src.setTileLoadFunction((tile, url) => {
+    const parts = url.split("/");
+    const z = Number(parts[0]);
+    const x = Number(parts[1]);
+    const y = Number(parts[2]);
+    tile.setLoader(async (extent, _resolution, projection) => {
+      try {
+        const entry = await pmtilesArchive.getZxy(z, x, y);
+        if (!entry || !entry.data) {
+          tile.setFeatures([]);
+          return;
+        }
+        const features = tile.getFormat().readFeatures(entry.data, {
+          extent,
+          featureProjection: projection,
+        });
+        tile.setFeatures(features);
+      } catch {
+        tile.setFeatures([]);
+      }
+    });
+  });
+  return src;
+}
+
+const backgroundSource = makeBackgroundSource(true);
+const marineSource = makeBackgroundSource(false);
+
+const styleDispatch = backgroundLayerStyle();
+const backgroundLayer = new VectorTileLayer({
   declutter: true,
-  imageRatio: 3,
-  style: backgroundLayerStyle(),
   source: backgroundSource,
+  // Marine is drawn by the dedicated layer below — skip it here so we don't
+  // get one labelled copy per visible world.
+  style: (feature) => feature.get("featureClass") === "marine" ? null : styleDispatch(feature),
 });
 map.addLayer(backgroundLayer);
 
+const marineLayer = new VectorTileLayer({
+  declutter: true,
+  source: marineSource,
+  style: (feature) => feature.get("featureClass") === "marine" ? styleDispatch(feature) : null,
+});
+map.addLayer(marineLayer);
+
 /* ── features layer (cities) ──────────────────────────────────────────── */
 
-// The style is a single mutable Style instance — we set the text and rgba
-// alphas per-feature on each render pass so newly-added features can fade in.
+// City marker: a small filled circle precisely centered on the city's
+// coordinates (CircleStyle is centered on its Point geometry). The label
+// sits just above the dot, centered horizontally on the same coordinate,
+// so the (dot, label) pair visually "points at" the place rather than
+// trailing off to the right of a square.
 const cityImageFill = new Fill({ color: "rgba(0,0,0,1)" });
 const cityImageStroke = new Stroke({ color: "rgba(224,201,166,1)", width: 1 });
-const cityShape = new RegularShape({
+const cityShape = new CircleStyle({
   fill: cityImageFill,
   stroke: cityImageStroke,
-  points: 4,
-  radius: 6,
-  angle: Math.PI / 4,
+  radius: 2.5,
 });
 const cityTextFill = new Fill({ color: "rgba(0,0,0,1)" });
 const cityTextStroke = new Stroke({ color: "rgba(224,201,166,1)", width: 2 });
-const cityText = new Text({
-  font: 'bold 14px "IM Fell English"',
-  textAlign: "left",
-  offsetX: 8,
-  offsetY: 2,
-  fill: cityTextFill,
-  stroke: cityTextStroke,
-});
-const cityStyle = new Style({ zIndex: 100, image: cityShape, text: cityText });
+// Dot style is shared and always rendered (`declutterMode: "none"`).
+// Label styles are PER-FEATURE — a fresh Text instance is constructed for
+// each city in the result handler below. Why not share? OL's declutter pass
+// reads each style's Text content at draw time, after the layer's style
+// function has run for every visible feature; with a single shared Text the
+// `.text` is whatever the last cityName setText() wrote, so all 300 labels
+// would render with the same string and declutter would collapse them. The
+// fade-in still works on shared Fill/Stroke instances because alpha is the
+// same for every newcomer in a given frame.
+const cityDotStyle = new Style({ zIndex: 100, image: cityShape, declutterMode: "none" });
+
+// `rank` is the city's index in the worker's score-sorted result for the
+// current viewport (0 = the most important city in view). Higher-ranked
+// cities get a higher style zIndex so OL's declutter pass resolves them
+// first and reserves their label slot before any neighbour can claim it.
+// Without this the top hit (e.g. Paris) gets buried inside a dense suburb
+// cluster.
+
+function makeCityStyles(name, rank) {
+  const text = new Text({
+    font: 'bold 14px "IM Fell English"',
+    textAlign: "center",
+    offsetX: 0,
+    offsetY: -10,                      // sits just above the dot
+    fill: cityTextFill,
+    stroke: cityTextStroke,
+    text: name,
+  });
+  // Higher rank-zero cities get a much higher zIndex so OL's declutter pass
+  // resolves them first and reserves their label slot before any neighbour
+  // can claim it. With all labels at the same zIndex, OL's tie-break order
+  // was hiding the top hit (Paris) inside dense suburb clusters.
+  const labelStyle = new Style({
+    zIndex: 1000 - rank,
+    text,
+  });
+  return [cityDotStyle, labelStyle];
+}
 
 let fadeStartedAt = 0;
 let fadeFrame = 0;
 
+// Per-render alpha mutation drives the fade-in. The text content lives on
+// each feature's own Style (set in the result handler), so we don't touch it
+// here — only the shared Fill/Stroke colors used by every city.
 function featuresLayerStyle(feature) {
   let alpha = 1;
   const featureStart = feature.get("_fadeStart");
@@ -259,8 +448,7 @@ function featuresLayerStyle(feature) {
   cityImageStroke.setColor(`rgba(224,201,166,${alpha})`);
   cityTextFill.setColor(`rgba(0,0,0,${alpha})`);
   cityTextStroke.setColor(`rgba(224,201,166,${alpha})`);
-  cityText.setText(feature.get("name"));
-  return cityStyle;
+  return feature.getStyle();
 }
 
 function startFadeTick() {
@@ -302,7 +490,7 @@ let latestSearchId = 0;
 // Diff-keyed by canonical identity so a city that stays visible across a
 // zoom step keeps the same Feature instance and doesn't re-fade.
 const visibleCities = new Map(); // key → Feature
-const cityKey = (c) => `${c.lon.toFixed(4)},${c.lat.toFixed(4)}|${c.name}`;
+const cityKey = (c) => `${c.x.toFixed(0)},${c.y.toFixed(0)}|${c.name}`;
 
 citiesWorker.onmessage = (event) => {
   const msg = event.data;
@@ -324,17 +512,22 @@ citiesWorker.onmessage = (event) => {
       }
     }
 
-    // Add newcomers with a fresh fade.
+    // Add newcomers with a fresh fade. Rank is the city's position in the
+    // worker's score-sorted result for this viewport — feeds `makeCityStyles`
+    // so the top hits always get a label even in a dense cluster.
     const now = performance.now();
     let added = false;
+    let rank = 0;
     for (const [key, city] of incoming) {
+      const thisRank = rank++;
       if (visibleCities.has(key)) continue;
       const feature = new Feature({
-        geometry: new Point(fromLonLat([city.lon, city.lat])),
+        geometry: new Point([city.x, city.y]),
         name: city.name,
         featureClass: "city",
       });
       feature.set("_fadeStart", now);
+      feature.setStyle(makeCityStyles(city.name, thisRank));
       visibleCities.set(key, feature);
       featuresSource.addFeature(feature);
       added = true;
@@ -358,15 +551,13 @@ async function bootCitiesWorker() {
 
 function refreshVisibleCities() {
   if (!workerReady) return;
-  const extent = view.calculateExtent(map.getSize());
-  const [minLon, minLat] = toLonLat(extent.slice(0, 2));
-  const [maxLon, maxLat] = toLonLat(extent.slice(2, 4));
+  const [minX, minY, maxX, maxY] = view.calculateExtent(map.getSize());
   const id = ++queryCounter;
   latestQueryId = id;
   citiesWorker.postMessage({
     type: "query",
     id,
-    minLon, minLat, maxLon, maxLat,
+    minX, minY, maxX, maxY,
     limit: MAX_VISIBLE_CITIES,
   });
 }
@@ -415,18 +606,23 @@ async function trackProgress(response, kind) {
   return out.buffer;
 }
 
-// Background: feed real bytes-loaded into the bar via OL's "featuresloadend"
-// event instead of fetch streaming, because OL owns that fetch.
-backgroundSource.on("featuresloadstart", () => {
+// Background: PMTiles streams in tile by tile, so "loaded" means "the first
+// frame's worth of tiles has rendered". `rendercomplete` fires once OL has
+// nothing left to fetch or render for the current view.
+let bgFirstTileStarted = false;
+backgroundSource.on("tileloadstart", () => {
+  if (bgFirstTileStarted) return;
+  bgFirstTileStarted = true;
   loadingStatusEl.textContent = "terras explicantur";
+  setProgress("background", 0.5);
 });
-backgroundSource.on("featuresloadend", () => {
+backgroundSource.on("tileloaderror", () => {
+  loadingStatusEl.textContent = "charta rumpitur — try refreshing";
+});
+map.once("rendercomplete", () => {
   setProgress("background", 1);
   backgroundLoaded = true;
   maybeHideLoading();
-});
-backgroundSource.on("featuresloaderror", () => {
-  loadingStatusEl.textContent = "charta rumpitur — try refreshing";
 });
 
 let citiesLoaded = false;
@@ -493,26 +689,23 @@ function querySearch(q) {
   citiesWorker.postMessage({ type: "search", id, q, limit: 12 });
 }
 
+// `c.display` is pre-baked at build time: "🇫🇷 Paris, France" (flag + city +
+// localised country name). No runtime dedup, no Intl, no concatenation —
+// arrondissement-style entries were folded into their parents in build-data
+// and PPLX entries were dropped from cities.bin entirely.
 function renderSearchResults(cities) {
-  searchHits = cities;
   searchHighlight = 0;
+  searchHits = cities;
   if (cities.length === 0) {
     searchResultsEl.innerHTML = `<div class="search-empty">no city found</div>`;
     return;
   }
-  const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
   searchResultsEl.innerHTML = cities
-    .map((c, idx) => {
-      let country = c.country.trim();
-      try { country = regionNames.of(country) || country; } catch {}
-      const pop = c.population
-        ? c.population.toLocaleString("en")
-        : "—";
-      return `<div class="search-result ${idx === 0 ? "active" : ""}" data-idx="${idx}">
-        <span class="name">${escapeHtml(c.name)}</span>
-        <span class="meta">${escapeHtml(country)} · ${pop}</span>
-      </div>`;
-    })
+    .map((c, idx) =>
+      `<div class="search-result ${idx === 0 ? "active" : ""}" data-idx="${idx}">
+        <span class="name">${escapeHtml(c.display)}</span>
+      </div>`,
+    )
     .join("");
 }
 
@@ -544,7 +737,7 @@ function zoomForCity(pop) {
 function jumpTo(city) {
   closeSearch();
   view.animate({
-    center: fromLonLat([city.lon, city.lat]),
+    center: [city.x, city.y],
     zoom: zoomForCity(city.population),
     duration: 900,
   });
@@ -643,18 +836,6 @@ document.addEventListener("mouseup", () => {
   document.body.classList.remove("cursor-move");
 });
 
-/* ── graticule ────────────────────────────────────────────────────────── */
-
-const graticuleLayer = new GraticuleLayer({
-  strokeStyle: new Stroke({ color: COLOR_GRATICULE }),
-  maxZoom: 5,
-  intervals: [10],
-  showLabels: true,
-  lonLabelFormatter: (lon) => String(lon < 0 ? lon + 360 : lon),
-  latLabelFormatter: (lat) => String(Math.abs(lat)),
-});
-map.addLayer(graticuleLayer);
-
 /* ── context menu ─────────────────────────────────────────────────────── */
 
 const contextMenuElement = document.getElementById("context-menu");
@@ -713,6 +894,6 @@ function getFeatureAtPixel(event) {
   return map.forEachFeatureAtPixel(
     event.pixel,
     (feature) => (feature.get("featureClass") === "city" ? feature : undefined),
-    { hitTolerance: 4 },
+    { hitTolerance: 4, layerFilter: (layer) => layer === featuresLayer },
   );
 }
