@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>World Map</title>
+    <title>Unfold - Modern cartography with an old-world soul</title>
     <link rel="shortcut icon" href="./static/assets/favicon.png" />
 
     <!-- Preload the first-paint font so the loading title renders in IM Fell
@@ -41,56 +41,92 @@
       }
 
       body,
-      #overlay,
-      #context-menu {
+      #overlay {
         cursor: url("./static/assets/default.cur"), default;
       }
 
-      body.cursor-move,
+      /* The grab/move cursor only applies while the user is actively
+         dragging the map — the body class is toggled from main.js on
+         pointerdrag and removed on mouseup. */
+      body.cursor-move {
+        cursor: url("./static/assets/move.cur"), grabbing;
+      }
+
+      /* Click-hand (point.cur) for everything that's a click target: the
+         corner buttons, search palette rows, context menu items, and the
+         interactive features on the map (cities, volcanoes, castles, …).
+         The map's pointermove handler sets mapElement.style.cursor to the
+         same url when the cursor is over an interactive feature, so the
+         whole UI uses one unified click-hand cursor. */
       button,
       a,
-      .search-result {
-        cursor: url("./static/assets/move.cur"), default;
+      .search-result,
+      .corner-btn,
+      #context-menu .item,
+      .map-clickable {
+        cursor: url("./static/assets/point.cur"), pointer;
       }
 
       #map {
         position: absolute;
         inset: 0;
+        /* The sepia+saturate+contrast filter used to live here. Looked great,
+           but ran every frame as a fullscreen GPU shader pass — combined with
+           the four mix-blend-mode overlays above, that's 5+ compositor passes
+           per frame and was the dominant zoom-slowness cost on integrated
+           GPUs. The palette below is already brown-toned and the parchment
+           overlays add the warmth; removing the filter is the biggest single
+           perf win without meaningful loss of period feel. */
       }
 
       /* ── adventure-map aesthetic ─────────────────────────────────────── */
 
-      /* Procedural parchment grain that multiplies into the map colours. */
+      /* Procedural parchment grain. background-position/size are driven
+         from JS (see main.js#syncPaperToMap) so the grain pans and zooms
+         with the map rather than staying glued to the viewport — the
+         parchment feels attached to the world. */
       #paper {
         position: absolute;
         inset: 0;
         pointer-events: none;
         z-index: 10;
         mix-blend-mode: multiply;
-        opacity: 0.45;
+        opacity: 0.55;
         background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='8'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.32  0 0 0 0 0.15  0 0 0 0.85 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
         background-size: 600px 600px;
       }
 
-      /* Laid-paper "wire lines": faint vertical lines from the papermaker's
-         mould, visible when the parchment is backlit. */
-      #wire-lines {
+/* Foxing — age spots real old paper picks up. A few large, soft brown
+         radial gradients in deterministic positions, so the map looks the
+         same on every reload (no random repaint flicker). */
+      #foxing {
         position: absolute;
         inset: 0;
         pointer-events: none;
         z-index: 10;
         mix-blend-mode: multiply;
-        opacity: 0.35;
-        background-image: repeating-linear-gradient(
-          90deg,
-          transparent 0,
-          transparent 13px,
-          rgba(70, 45, 20, 0.05) 13px,
-          rgba(70, 45, 20, 0.05) 14px
-        );
+        opacity: 0.5;
+        background-image:
+          radial-gradient(ellipse 80px 60px at 12% 18%, rgba(120, 70, 30, 0.22), transparent 70%),
+          radial-gradient(ellipse 50px 70px at 78% 32%, rgba(120, 70, 30, 0.18), transparent 70%),
+          radial-gradient(ellipse 90px 40px at 22% 78%, rgba(140, 80, 30, 0.16), transparent 70%),
+          radial-gradient(ellipse 60px 90px at 88% 82%, rgba(110, 60, 25, 0.20), transparent 70%),
+          radial-gradient(ellipse 40px 30px at 56% 12%, rgba(130, 80, 35, 0.16), transparent 70%),
+          radial-gradient(ellipse 70px 50px at 42% 55%, rgba(110, 60, 25, 0.14), transparent 70%);
       }
 
-      /* Soft brown vignette around the edges. */
+      /* Hide the mix-blend-mode parchment layers during pan/zoom so the
+         GPU isn't blending two fullscreen multiply passes against the
+         constantly-changing map underneath every frame. The class is
+         toggled from main.js on map movestart/moveend. `visibility:
+         hidden` (rather than opacity) so the browser can skip the
+         compositor pass entirely while the user is interacting. */
+      body.map-interacting #paper,
+      body.map-interacting #foxing {
+        visibility: hidden;
+      }
+
+/* Soft brown vignette around the edges. */
       #vignette {
         position: absolute;
         inset: 0;
@@ -121,18 +157,104 @@
         );
       }
 
-      /* The plate-mark depression: where the copper plate pressed the damp
-         rag paper. A thin engraved frame just outside the map area. */
-      #plate-mark {
-        position: absolute;
-        inset: 22px;
+/* ── hover tooltip (facts, volcanoes, seamounts, megaliths) ──────── */
+
+      #hover-tip {
+        position: fixed;
+        z-index: 70;
         pointer-events: none;
-        z-index: 14;
-        border: 1px solid rgba(60, 40, 15, 0.55);
+        max-width: 260px;
+        padding: 6px 10px;
+        background: rgba(246, 230, 200, 0.97);
+        border: 1px solid #8a6a3a;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(40, 25, 8, 0.30);
+        color: #2b1a0a;
+        font: 13px "IM Fell English", "Palatino", serif;
+        opacity: 0;
+        transition: opacity 90ms ease-out;
+      }
+      #hover-tip.visible {
+        opacity: 1;
+      }
+      #hover-tip .tip-title {
+        font-weight: bold;
+        font-size: 14px;
+        line-height: 1.15;
+      }
+      #hover-tip .tip-sub {
+        margin-top: 2px;
+        font-size: 12px;
+        font-style: italic;
+        color: #6a4a20;
+      }
+
+      /* ── corner buttons (search + github) ───────────────────────────── */
+
+      /* Two round, identically-styled buttons in the top-right corner —
+         a discoverability handle for the ⌘K search palette plus a link
+         to the project's GitHub. They sit above all map content (z-index
+         50, below the hover tip / context menu / search but above the
+         vignette + parchment overlays). */
+      #corner-buttons {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 50;
+        display: flex;
+        gap: 10px;
+      }
+      .corner-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: rgba(246, 230, 200, 0.95);
+        border: 1px solid #8a6a3a;
         box-shadow:
-          inset 0 0 0 1px rgba(245, 222, 184, 0.3),
-          inset 0 0 8px rgba(70, 45, 20, 0.28),
-          0 0 1px rgba(70, 45, 20, 0.5);
+          0 2px 8px rgba(40, 25, 8, 0.22),
+          inset 0 0 18px rgba(170, 130, 70, 0.15);
+        /* cursor inherits from .corner-btn rule in the buttons/a block above */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #2b1a0a;
+        position: relative;
+        text-decoration: none;
+        transition: background 120ms ease-out, transform 120ms ease-out;
+      }
+      .corner-btn:hover {
+        background: rgba(255, 240, 215, 1);
+        transform: translateY(-1px);
+      }
+      .corner-btn:active {
+        transform: translateY(0);
+      }
+      .corner-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: #2b1a0a;
+        display: block;
+      }
+      /* CSS-only tooltip — `data-label` text shows below the button on
+         hover. `right: 0` keeps the rightmost (github) tooltip from
+         overflowing the viewport edge. */
+      .corner-btn::after {
+        content: attr(data-label);
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        white-space: nowrap;
+        background: rgba(40, 25, 10, 0.94);
+        color: #f6e6c8;
+        padding: 4px 9px;
+        border-radius: 4px;
+        font: 12px "Palatino", "Georgia", serif;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease-out;
+      }
+      .corner-btn:hover::after {
+        opacity: 1;
       }
 
       /* ── context menu ────────────────────────────────────────────────── */
@@ -294,11 +416,43 @@
     <div id="map"></div>
 
     <div id="paper"></div>
-    <div id="wire-lines"></div>
+    <div id="foxing"></div>
 
     <div id="vignette"></div>
     <div id="sun"></div>
-    <div id="plate-mark"></div>
+
+    <div id="hover-tip" aria-hidden="true"></div>
+
+    <div id="corner-buttons">
+      <!-- Search button — opens the ⌘K palette so first-time visitors
+           know the feature exists without needing to find the shortcut. -->
+      <button
+        id="btn-search"
+        class="corner-btn"
+        type="button"
+        aria-label="Search cities"
+        data-label="Search  ⌘K"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/>
+        </svg>
+      </button>
+      <!-- GitHub link to the project source. Opens in a new tab; rel
+           includes noopener so the new tab can't navigate back. -->
+      <a
+        id="btn-github"
+        class="corner-btn"
+        href="https://github.com/aymericbeaumet/unfold"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Project source on GitHub"
+        data-label="GitHub"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 .5a11.5 11.5 0 0 0-3.63 22.41c.57.1.78-.25.78-.55v-2.03c-3.2.69-3.88-1.43-3.88-1.43-.53-1.32-1.29-1.67-1.29-1.67-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.06 11.06 0 0 1 2.9-.39 11 11 0 0 1 2.9.39c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.77.12 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.78 1.07.78 2.17v3.21c0 .31.21.66.79.55A11.5 11.5 0 0 0 12 .5z"/>
+        </svg>
+      </a>
+    </div>
 
     <div id="context-menu">
       <div class="item" data-action="coordinates"></div>
