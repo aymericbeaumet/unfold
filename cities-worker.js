@@ -1,6 +1,6 @@
 // Owns the cities.bin ArrayBuffer (transferred zero-copy from the main thread)
 // and answers two query types:
-//   - top: super-capitals (capital AND pop >= 1M) + top-N by population
+//   - query: visible super-capitals + visible cities within a population tier
 //   - search: top-N cities matching a normalized text query
 //
 // "Biggest city wins overlap" is the product rule: declutter must keep the
@@ -24,15 +24,16 @@
 // Wire protocol:
 //   ← { type: "init", buffer: ArrayBuffer }        (buffer is transferred)
 //   → { type: "ready" }
-//   ← { type: "query", id, limit? }                (no bbox: global top)
+//   ← { type: "query", id, minX, minY, maxX, maxY, limit? }
 //   → { type: "result", id, cities: [{ name, x, y, population, wiki, capital }, ...] }
 //   ← { type: "search", id, q, limit? }
-//   → { type: "search-result", id, cities: [{ display, x, y, population }, ...] }
+//   → { type: "search-result", id, cities: [{ name, display, x, y, population, wiki }, ...] }
 
 const HEADER_FIELDS = 14;
 const DEFAULT_TOP_LIMIT = 200;
 const DEFAULT_SEARCH_LIMIT = 12;
 const SUPER_CAPITAL_POP_MIN = 1_000_000;
+const MERCATOR_WORLD = 2 * Math.PI * 6378137;
 const decoder = new TextDecoder();
 
 let count = 0;
@@ -41,11 +42,8 @@ let xs, ys, pops;
 let nameOffsets, names, displayOffsets, displays;
 let searchOffsets, searches, wikiOffsets, wikis;
 // Indices into the bin re-sorted by population descending. Built once at
-// init so every topQuery is O(limit). Filled at the end of init().
+// init so every viewport query is O(limit). Filled at the end of init().
 let popSortedIndices = null;
-// Reverse map binIndex → popRank, so topRow can attach the rank to each
-// city object without scanning popSortedIndices per call.
-let popRankByBinIndex = null;
 
 function init(buffer) {
   const h = new Uint32Array(buffer, 0, HEADER_FIELDS);
@@ -62,12 +60,12 @@ function init(buffer) {
   wikiOffsets = new Uint32Array(buffer, h[10], count + 1);
   wikis = new Uint8Array(buffer, h[11]);
   // Defensive: if the bin pre-dates the capitalCount field, h[13] is
-  // garbage from the xs section. Clamp to [0, count] so topQuery still
-  // returns sane output instead of looping over nonsense.
+  // garbage from the xs section. Clamp to [0, count] so queries still
+  // return sane output instead of looping over nonsense.
   const raw = h[13];
   capitalCount = (Number.isFinite(raw) && raw >= 0 && raw <= count) ? raw : 0;
 
-  // Sort indices by population (descending) so topQuery can slice the
+  // Sort indices by population (descending) so viewport queries can scan the
   // global top-N by pop in one linear pass. ~50 ms for 200 k cities,
   // paid once at worker startup.
   const indices = new Array(count);
@@ -75,32 +73,17 @@ function init(buffer) {
   indices.sort((a, b) => pops[b] - pops[a]);
   popSortedIndices = new Uint32Array(indices);
 
-  // Build a reverse map (binIndex → popRank) so topRow can tell each
-  // city its rank in pop-sorted order without a per-call O(n) scan. Used
-  // by the main thread to route features to the correct tier-band source.
-  popRankByBinIndex = new Uint32Array(count);
-  for (let k = 0; k < count; k++) {
-    popRankByBinIndex[popSortedIndices[k]] = k;
-  }
-
-  // Allocate decode caches and FILL them eagerly. Decoding 196 k names
-  // + 196 k wikis upfront is ~1 s, all on worker startup. After this,
-  // every topQuery is O(limit) with no decoder.decode() calls on the
-  // hot path — the main thread can fly between tier changes without
-  // the worker stalling on per-string UTF-8 conversion.
+  // Decode only rows that are actually returned. A viewport query usually
+  // returns tens of cities, so eagerly decoding all ~196 k names and wiki
+  // strings wastes startup time and hundreds of MB across the worker and
+  // main-thread feature graph.
   nameCache = new Array(count);
   wikiCache = new Array(count);
   displayCache = new Array(count);
-  for (let i = 0; i < count; i++) {
-    nameCache[i] = decoder.decode(names.subarray(nameOffsets[i], nameOffsets[i + 1]));
-    wikiCache[i] = decoder.decode(wikis.subarray(wikiOffsets[i], wikiOffsets[i + 1]));
-  }
 }
 
-// Lazy decode caches. The first topQuery for a high-zoom tier touches
-// tens of thousands of names + wikis; without caching, each subsequent
-// query (re-render after pan/zoom) would pay the same ~250 ms decode
-// cost. The arrays grow as needed and shared across queries.
+// Lazy decode caches shared by viewport and search queries. The arrays grow
+// only for rows that have actually been displayed or searched.
 let nameCache;
 let wikiCache;
 let displayCache;
@@ -135,42 +118,52 @@ function topRow(i, capital, isSuper) {
     wiki: wikiAt(i),
     capital,
     super: isSuper,
-    popRank: popRankByBinIndex[i],
   };
 }
 function searchRow(i) {
   return {
+    name: nameAt(i),
     display: displayAt(i),
     x: xs[i],
     y: ys[i],
     population: pops[i],
+    wiki: wikiAt(i),
   };
 }
 
-// Global top query: ALL super-capitals (capital AND pop >= 1M) +
-// top-N globally by population. Super-capitals are included even if
-// their pop pushes them below the top-N — they're the always-render set.
-// The remaining slots go to the top-N by population, so the BIGGEST
-// cities (regardless of capital status) win their overlap contests.
-function topQuery(limit) {
+// Return only cities inside the buffered viewport. `limit` remains a global
+// population-rank cutoff, so a z=4 query still means "the top 100 cities",
+// just without constructing off-screen OpenLayers features for them. X is
+// tested modulo one Mercator world so queries work in every wrapped copy.
+function visibleQuery(minX, minY, maxX, maxY, limit) {
   const out = [];
   const seen = new Set();
-  // First: super-capitals. Iterate the capital block (indices 0..capitalCount)
-  // and include any with pop >= 1M. ~50 entries at most.
+  const span = Math.max(0, maxX - minX);
+  const includesX = (x) => {
+    if (span >= MERCATOR_WORLD) return true;
+    let delta = (x - minX) % MERCATOR_WORLD;
+    if (delta < 0) delta += MERCATOR_WORLD;
+    return delta <= span;
+  };
+  const includes = (i) => ys[i] >= minY && ys[i] <= maxY && includesX(xs[i]);
+
+  // Super-capitals remain outside the population cutoff, but there is no
+  // reason to allocate them when they are not in or near the viewport.
   for (let i = 0; i < capitalCount; i++) {
-    if (pops[i] >= SUPER_CAPITAL_POP_MIN) {
+    if (pops[i] >= SUPER_CAPITAL_POP_MIN && includes(i)) {
       seen.add(i);
       out.push(topRow(i, 1, 1));
     }
   }
-  // Second: top-N by population (skip already-included super capitals).
-  let added = 0;
-  for (let k = 0; k < count && added < limit; k++) {
+
+  // Inspect the first `limit` population ranks and emit the visible subset.
+  const end = Math.min(count, limit);
+  for (let k = 0; k < end; k++) {
     const i = popSortedIndices[k];
     if (seen.has(i)) continue;
+    if (!includes(i)) continue;
     const isCapital = i < capitalCount ? 1 : 0;
     out.push(topRow(i, isCapital, 0));
-    added++;
   }
   return out;
 }
@@ -251,7 +244,13 @@ self.onmessage = (event) => {
       self.postMessage({ type: "ready" });
       break;
     case "query": {
-      const cities = topQuery(msg.limit || DEFAULT_TOP_LIMIT);
+      const cities = visibleQuery(
+        msg.minX,
+        msg.minY,
+        msg.maxX,
+        msg.maxY,
+        msg.limit || DEFAULT_TOP_LIMIT,
+      );
       self.postMessage({ type: "result", id: msg.id, cities });
       break;
     }

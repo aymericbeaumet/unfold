@@ -18,6 +18,10 @@ import { defaults as defaultInteractions } from "ol/interaction/defaults";
 import MouseWheelZoom from "ol/interaction/MouseWheelZoom";
 import { fromLonLat, toLonLat } from "ol/proj";
 import { PMTiles } from "pmtiles";
+import {
+  CITY_NAVIGATION_DURATION_MS,
+  zoomForCityPopulation,
+} from "./navigation.mjs";
 
 // `new URL(..., import.meta.url)` shares Parcel's asset pipeline with the
 // `<link rel=preload>` tags in index.html, so the preload hash matches the
@@ -394,10 +398,8 @@ const CITY_LIMITS = [
 ];
 function cityLimitFor(zoom) {
   for (const t of CITY_LIMITS) if (zoom <= t.maxZoom) return t.limit;
-  return 280;
+  return CITY_LIMITS[CITY_LIMITS.length - 1].limit;
 }
-const CITY_FADE_MS = 350;
-
 // Web Mercator vertical extent (meters).
 const MERCATOR_Y_MAX = 20037508.342789244;
 // Full horizontal span of one Web Mercator world (2 × π × earthRadius).
@@ -1035,17 +1037,15 @@ map.addLayer(marineLayer);
 const cityTextFill = new Fill({ color: "rgba(0,0,0,1)" });
 const cityTextStroke = new Stroke({ color: "rgba(224,201,166,1)", width: 2.5 });
 
-function makeCityStyles(name, isCapital, isPinned, population) {
+function makeCityStyles(name, isSelected, population) {
   // Capitals look identical to non-capitals — no leading glyph, no bold,
   // no font-size bump. Capitals still render unconditionally when they're
   // super-capitals (pop ≥ 1 M) because we route those to the alwaysLayer
   // upstream; the styling itself just doesn't call them out.
   //
-  // Pinned (searched) cities keep their visual cue — a leading ★ in bold
-  // — because the product wants the search target to be findable on the
-  // map at a glance. Pinned is also still routed to the alwaysLayer.
-  const prefix = isPinned ? "★ " : "";
-  const fontSpec = isPinned
+  // A searched city is bold and lives on the non-decluttered layer so its
+  // name remains readable at the destination zoom.
+  const fontSpec = isSelected
     ? 'bold 16px "IM Fell English"'
     : '12px "IM Fell English"';
   const text = new Text({
@@ -1056,104 +1056,52 @@ function makeCityStyles(name, isCapital, isPinned, population) {
     offsetY: 0,
     fill: cityTextFill,
     stroke: cityTextStroke,
-    text: `${prefix}${name}`,
+    text: name,
   });
   // zIndex driven purely by population — biggest wins overlap, no
-  // capital-vs-non-capital tie-breaker. Pinned bonus 10 000 is
-  // unreachable by any natural pop, so a pin always wins (it's also on
+  // capital-vs-non-capital tie-breaker. Selected bonus 10 000 is
+  // unreachable by any natural pop, so the selection always wins (it's also on
   // its own no-declutter layer for belt-and-braces).
   const popZ = Math.floor(Math.log10(Math.max(population || 1, 1)) * 100);
-  const pinnedBoost = isPinned ? 10000 : 0;
-  const zIndex = popZ + pinnedBoost;
+  const selectedBoost = isSelected ? 10000 : 0;
+  const zIndex = popZ + selectedBoost;
   return [new Style({ zIndex, text })];
 }
 
-// Fade-in was dropped to make cities feel "instant" at high-zoom tier
-// changes — at z>=15 the rebuild brings in 60 k+ features and the 350 ms
-// alpha ramp made the load feel laggy. Cities now render at full opacity
-// the moment they're added to the source.
+// City results render at full opacity as soon as the post-move viewport
+// query lands; there is no second alpha animation after the camera settles.
 function featuresLayerStyle(feature) {
   return feature.getStyle();
 }
 
-// Cities source uses wrapX=false combined with manual replication across
-// the three world copies nearest the view centre (see rebuildCityFeatures).
-// The point of doing it manually instead of relying on OL's wrapX is pan
-// stability: with wrapX=true the renderer iterates whichever world copies
-// happen to be in the view extent right now, which means panning changes
-// the declutter input even when the source content hasn't changed and
-// labels appear/disappear mid-pan. By baking in the three copies around
-// the current "world centre" and only swapping them when the user
-// actually crosses a world-boundary, pan within a world leaves the
-// rendered output unchanged, and the swap at boundary happens off-screen
-// (the dropped copy was far west, the added copy is far east, neither is
-// visible). renderBuffer bumped to 600 so labels near the viewport edge
-// stay drawn while the user pans toward them — no pop-in.
-// Tier band sources — one VectorSource per CITY_LIMITS tier, each holding
-// the cities whose popRank falls in that band's range (band T = popRank
-// in [CITY_LIMITS[T-1].limit, CITY_LIMITS[T].limit)). All band layers
-// share the declutter group "cities" so a single declutter pass picks
-// the biggest cities across the entire visible set; OL still iterates
-// features per layer at render time, but at low zoom only the early
-// bands are visible (each holding only their own ~few-hundred features)
-// so the per-render iteration scales with the active zoom, not with the
-// 150 k pre-built population.
-//
-// Tier change at runtime is now just `layer.setVisible(t ≤ activeTier)`
-// — there's no source rebuild, no addFeatures, no allocation, so the
-// transition is instantaneous.
-const bandSources = [];
-const bandLayers = [];
-for (let t = 0; t < CITY_LIMITS.length; t++) {
-  const source = new VectorSource({ wrapX: false });
-  const layer = new VectorLayer({
-    renderBuffer: 600,
-    declutter: "cities", // shared group across all band layers
-    source,
-    style: featuresLayerStyle,
-  });
-  layer.setVisible(false);
-  map.addLayer(layer);
-  bandSources.push(source);
-  bandLayers.push(layer);
-}
+// Only cities inside a buffered viewport are materialized as OpenLayers
+// features. The worker still applies the global population tier, preserving
+// the same label priority, but zooming no longer competes with an up-front
+// build of 150 k cities × three wrapped copies.
+const CITY_RENDER_BUFFER_PX = 160;
+const CITY_QUERY_BUFFER_PX = 240;
+const citySource = new VectorSource({ wrapX: false });
+const cityLayer = new VectorLayer({
+  renderBuffer: CITY_RENDER_BUFFER_PX,
+  declutter: "cities",
+  source: citySource,
+  style: featuresLayerStyle,
+});
+map.addLayer(cityLayer);
 
-// "Always" layer: super-capitals (capital AND pop ≥ 1 M) + pinned
+// "Always" layer: super-capitals (capital AND pop ≥ 1 M) + selected
 // (searched) cities. declutter:false so every feature in this layer
 // renders unconditionally — that's how we honour "super capitals always
 // appear" and "the searched city is always displayed" as hard rules.
 const alwaysSource = new VectorSource({ wrapX: false });
 const alwaysLayer = new VectorLayer({
-  renderBuffer: 600,
+  renderBuffer: CITY_RENDER_BUFFER_PX,
   declutter: false,
   source: alwaysSource,
   style: featuresLayerStyle,
   zIndex: 200,
 });
 map.addLayer(alwaysLayer);
-
-// `bandForRank` routes a city to the smallest band whose cumulative
-// limit includes its popRank. Cities whose popRank falls past every
-// CITY_LIMITS bucket end up in the last band (so a high-zoom tier
-// includes them when active).
-function bandForRank(rank) {
-  for (let t = 0; t < CITY_LIMITS.length; t++) {
-    if (rank < CITY_LIMITS[t].limit) return t;
-  }
-  return CITY_LIMITS.length - 1;
-}
-
-// Toggle band-layer visibility to match the current zoom tier — every
-// band ≤ active is visible; everything past it is hidden. No source
-// touched, no features rebuilt.
-let activeTier = -1;
-function activateTier(t) {
-  if (t === activeTier) return;
-  activeTier = t;
-  for (let i = 0; i < bandLayers.length; i++) {
-    bandLayers[i].setVisible(i <= t);
-  }
-}
 
 /* ── cities worker ────────────────────────────────────────────────────── */
 
@@ -1168,155 +1116,57 @@ let latestQueryId = 0;
 let searchCounter = 0;
 let latestSearchId = 0;
 
-// Canonical list of cities the worker selected for the current zoom tier.
-// The actual Features in `featuresSource` are derived from this — three
-// world-copies of each canonical city, regenerated only when the user
-// crosses a world boundary (worldCenter changes) or when the worker
-// returns a fresh set (tier changes).
+// Canonical list of cities the worker selected for the buffered viewport.
+// The actual features are three wrapped copies around the current world.
 let canonicalCities = [];
-let currentWorldCenter = null;
 
-// Pinned cities — cities the user searched and flew to. Stored separately
-// so they survive every tier-change refresh: even after the worker
-// replaces canonicalCities with a different set, the pinned cities stay
-// in the source and keep rendering (with declutterMode='none', so they
-// can never be culled). cityKey is shared with canonicalCities so a
-// pinned city that's already in the canonical set isn't duplicated.
-const pinnedCities = new Map();
+// The current search selection stays bold and outside decluttering until a
+// different city is selected. Keeping a single value ensures previous search
+// targets immediately return to their regular style.
+let selectedCity = null;
 const cityKeyOf = (c) => `${c.x.toFixed(0)},${c.y.toFixed(0)}|${c.name}`;
 
-function pinSearchedCity(city) {
-  const key = cityKeyOf(city);
-  if (pinnedCities.has(key)) return;
-  pinnedCities.set(key, { ...city, pinned: true });
-  // Add the city as a pinned-style feature on alwaysSource — that
-  // guarantees rendering regardless of declutter or zoom tier. If the
-  // city is ALSO in a band source (top 150 k), the band copy renders
-  // too with its regular non-pinned style; the ★ pinned version
-  // overlays at the same screen pixel because both are at the city's
-  // exact coords, so the visual is a single bold label.
-  const styles = makeCityStyles(city.name, city.capital === 1, true, city.population);
-  const meta = { population: city.population, wiki: city.wiki };
-  const features = [];
-  const wc = currentWorldCenter ?? 0;
-  for (let w = wc - 1; w <= wc + 1; w++) {
-    const offsetX = w * MERCATOR_WORLD;
-    const feature = new Feature({
-      geometry: new Point([city.x + offsetX, city.y]),
-      name: city.name,
-      featureClass: "city",
-      _dataset: "city",
-      _label: city.name,
-      _meta: meta,
-    });
-    feature.setStyle(styles);
-    features.push(feature);
-  }
-  alwaysSource.addFeatures(features);
+function selectSearchedCity(city) {
+  selectedCity = city;
+  rebuildCityFeatures();
 }
-
-// Build batch size — features built per requestAnimationFrame frame.
-// 2000 features × 3 world-copies = 6000 OL allocations per batch (~30 ms
-// on a mid-laptop). Small enough to keep the frame budget; large enough
-// that the build wraps up in a few seconds for the 150 k full tier.
-const CITY_BUILD_BATCH = 2000;
-let buildHandle = 0;
-// Track every built feature by city-key so the worldCenter-rebuild path
-// can find and dispose of features when the user crosses a world
-// boundary, and so pin-a-searched-city can promote a feature to the
-// always-layer without rebuilding the whole world.
-const featureRecordByKey = new Map();
-// Used by `rebuildCityFeatures` to detect when worker results arrive a
-// second time (which only happens on bin reload during dev).
-let buildInProgress = false;
 
 function rebuildCityFeatures() {
   const cx = view.getCenter()?.[0] ?? 0;
-  const newWorldCenter = Math.round(cx / MERCATOR_WORLD);
-  // If we already built for this worldCenter, just toggle visibility.
-  if (newWorldCenter === currentWorldCenter && featureRecordByKey.size > 0) {
-    return;
-  }
-  // Cancel any in-flight build from a previous rebuild call.
-  if (buildHandle) {
-    cancelAnimationFrame(buildHandle);
-    buildHandle = 0;
-  }
-  currentWorldCenter = newWorldCenter;
-  for (const source of bandSources) source.clear();
+  const worldCenter = Math.round(cx / MERCATOR_WORLD);
+  citySource.clear();
   alwaysSource.clear();
-  featureRecordByKey.clear();
-  // Merge canonicalCities + pinnedCities, deduping by key.
+
+  // Merge the viewport result with the current search selection and render each
+  // city exactly once, on either the decluttered or always-visible layer.
   const displayed = new Map();
   for (const c of canonicalCities) displayed.set(cityKeyOf(c), c);
-  for (const [k, p] of pinnedCities) {
-    if (!displayed.has(k)) displayed.set(k, p);
-  }
-  // The worker emits canonicalCities in priority order: super-capitals
-  // first, then top-N by population. Iterating displayed.values() in
-  // insertion order means the FIRST batch built is the most important
-  // cities — they appear after the first frame even when the rest of
-  // the full 150 k tier takes a few seconds to populate.
-  const allCities = Array.from(displayed.values());
-  buildInProgress = true;
+  const selectedKey = selectedCity ? cityKeyOf(selectedCity) : null;
+  if (selectedCity) displayed.set(selectedKey, selectedCity);
 
-  let cursor = 0;
-  function buildBatch() {
-    buildHandle = 0;
-    const end = Math.min(cursor + CITY_BUILD_BATCH, allCities.length);
-    // One bucket per band + one for the always layer. Filled this batch,
-    // flushed in a single addFeatures call per source to avoid 3×N
-    // RBush rebuilds.
-    const bandBuckets = bandSources.map(() => []);
-    const alwaysBucket = [];
-    for (let i = cursor; i < end; i++) {
-      const city = allCities[i];
-      const key = cityKeyOf(city);
-      const isCapital = city.capital === 1;
-      const isSuper = city.super === 1;
-      const isPinned = pinnedCities.has(key);
-      const always = isSuper || isPinned;
-      // One style array per city — shared across all three world-copies
-      // so we don't allocate 3× new Text + new Style per city.
-      const sharedStyle = makeCityStyles(city.name, isCapital, isPinned, city.population);
-      const meta = { population: city.population, wiki: city.wiki };
-      const popRank = typeof city.popRank === "number" ? city.popRank : Infinity;
-      const bandIdx = always ? -1 : bandForRank(popRank);
-      const features = [];
-      for (let w = currentWorldCenter - 1; w <= currentWorldCenter + 1; w++) {
-        const offsetX = w * MERCATOR_WORLD;
-        const feature = new Feature({
-          geometry: new Point([city.x + offsetX, city.y]),
-          name: city.name,
-          featureClass: "city",
-          _dataset: "city",
-          _label: city.name,
-          _meta: meta,
-          _popRank: popRank,
-          _super: isSuper ? 1 : 0,
-        });
-        feature.setStyle(sharedStyle);
-        features.push(feature);
-        if (always) {
-          alwaysBucket.push(feature);
-        } else {
-          bandBuckets[bandIdx].push(feature);
-        }
-      }
-      featureRecordByKey.set(key, { features, bandIdx, always });
-    }
-    for (let t = 0; t < bandBuckets.length; t++) {
-      if (bandBuckets[t].length) bandSources[t].addFeatures(bandBuckets[t]);
-    }
-    if (alwaysBucket.length) alwaysSource.addFeatures(alwaysBucket);
-    cursor = end;
-    if (cursor < allCities.length) {
-      buildHandle = requestAnimationFrame(buildBatch);
-    } else {
-      buildInProgress = false;
+  const cityFeatures = [];
+  const alwaysFeatures = [];
+  for (const [key, city] of displayed) {
+    const isSelected = key === selectedKey;
+    const isSuper = city.super === 1;
+    const target = isSelected || isSuper ? alwaysFeatures : cityFeatures;
+    const sharedStyle = makeCityStyles(city.name, isSelected, city.population);
+    const meta = { population: city.population, wiki: city.wiki };
+    for (let w = worldCenter - 1; w <= worldCenter + 1; w++) {
+      const feature = new Feature({
+        geometry: new Point([city.x + w * MERCATOR_WORLD, city.y]),
+        name: city.name,
+        featureClass: "city",
+        _dataset: "city",
+        _label: city.name,
+        _meta: meta,
+      });
+      feature.setStyle(sharedStyle);
+      target.push(feature);
     }
   }
-  buildBatch();
+  if (cityFeatures.length) citySource.addFeatures(cityFeatures);
+  if (alwaysFeatures.length) alwaysSource.addFeatures(alwaysFeatures);
 }
 
 citiesWorker.onmessage = (event) => {
@@ -1324,19 +1174,11 @@ citiesWorker.onmessage = (event) => {
   if (msg.type === "ready") {
     workerReady = true;
     onCitiesReady();
-    // After worker is ready, request the FULL highest-tier set in one
-    // shot. Build is batched so the first cities appear instantly while
-    // the rest populate in the background. After this completes there's
-    // no further worker round-trip — tier changes are layer-visibility
-    // toggles handled directly in the moveend listener.
-    refreshVisibleCities(CITY_LIMITS[CITY_LIMITS.length - 1].limit);
+    refreshVisibleCities();
   } else if (msg.type === "result") {
     if (msg.id !== latestQueryId) return;
     canonicalCities = msg.cities;
-    currentWorldCenter = null; // force rebuild
     rebuildCityFeatures();
-    // Activate the current tier now that the source has features.
-    activateTier(cityTierForZoom(view.getZoom() ?? 0));
   } else if (msg.type === "search-result") {
     if (msg.id !== latestSearchId) return;
     renderSearchResults(msg.cities);
@@ -1350,37 +1192,30 @@ async function bootCitiesWorker() {
   citiesWorker.postMessage({ type: "init", buffer }, [buffer]);
 }
 
-// Tier change at runtime is just a layer-visibility toggle — the
-// features are pre-built once at startup and never re-queried.
-function cityTierForZoom(z) {
-  for (let i = 0; i < CITY_LIMITS.length; i++) {
-    if (z <= CITY_LIMITS[i].maxZoom) return i;
-  }
-  return CITY_LIMITS.length - 1;
-}
-function refreshVisibleCities(explicitLimit) {
+function refreshVisibleCities() {
   if (!workerReady) return;
+  const size = map.getSize();
+  const resolution = view.getResolution();
+  if (!size || !resolution) return;
+  const extent = view.calculateExtent(size);
+  const padding = CITY_QUERY_BUFFER_PX * resolution;
   const id = ++queryCounter;
   latestQueryId = id;
   citiesWorker.postMessage({
     type: "query",
     id,
-    limit: explicitLimit ?? cityLimitFor(view.getZoom() ?? 0),
+    minX: extent[0] - padding,
+    minY: Math.max(-MERCATOR_Y_MAX, extent[1] - padding),
+    maxX: extent[2] + padding,
+    maxY: Math.min(MERCATOR_Y_MAX, extent[3] + padding),
+    limit: cityLimitFor(view.getZoom() ?? 0),
   });
 }
 
 map.on("moveend", () => {
-  // Visibility toggle for the current zoom tier — no source rebuild.
-  activateTier(cityTierForZoom(view.getZoom() ?? 0));
-  // Cross-world rebuild: only fires when the user pans across a world
-  // boundary. The features need to be re-positioned so their three
-  // world-copies are centred around the new world.
-  const cx = view.getCenter()?.[0] ?? 0;
-  const newWorldCenter = Math.round(cx / MERCATOR_WORLD);
-  if (newWorldCenter !== currentWorldCenter && !buildInProgress) {
-    rebuildCityFeatures();
-    activateTier(cityTierForZoom(view.getZoom() ?? 0));
-  }
+  // Keep the current small feature set stable throughout the interaction;
+  // query and swap the buffered viewport only after the camera settles.
+  refreshVisibleCities();
 });
 
 /* ── generic point-dataset layers ─────────────────────────────────────── */
@@ -2100,7 +1935,18 @@ function maybeHideLoading() {
 // world view. Skipped entirely if the URL hash carries explicit coords
 // (the user has asked for a specific view; don't second-guess them).
 let pendingGeolocationTarget = null;
+let automaticGeolocationEnabled = true;
+
+function cancelAutomaticGeolocation() {
+  automaticGeolocationEnabled = false;
+  pendingGeolocationTarget = null;
+}
+
 function maybeFlyToGeolocation() {
+  if (!automaticGeolocationEnabled) {
+    pendingGeolocationTarget = null;
+    return;
+  }
   if (!pendingGeolocationTarget) return;
   const target = pendingGeolocationTarget;
   pendingGeolocationTarget = null;
@@ -2118,6 +1964,10 @@ function startGeolocation() {
   if (!navigator.geolocation) return; // no API (rare)
   navigator.geolocation.getCurrentPosition(
     (pos) => {
+      // The permission callback may arrive several seconds after startup.
+      // Never let it override a city selection or manual map interaction
+      // that happened while the browser prompt was open.
+      if (!automaticGeolocationEnabled) return;
       pendingGeolocationTarget = {
         lon: pos.coords.longitude,
         lat: pos.coords.latitude,
@@ -2143,6 +1993,8 @@ function startGeolocation() {
     },
   );
 }
+mapElement.addEventListener("pointerdown", cancelAutomaticGeolocation, { passive: true });
+mapElement.addEventListener("wheel", cancelAutomaticGeolocation, { passive: true });
 startGeolocation();
 
 // Watchdog: if the user is offline / data missing, surface the status text.
@@ -2228,14 +2080,6 @@ function highlightSearch(idx) {
   items[searchHighlight].scrollIntoView({ block: "nearest" });
 }
 
-function zoomForCity(pop) {
-  if (pop > 10_000_000) return 8;
-  if (pop > 1_000_000) return 9;
-  if (pop > 100_000) return 10;
-  if (pop > 10_000) return 11;
-  return 12;
-}
-
 // Earth-style "fly to" — two parallel animations: the centre pans smoothly
 // across the entire duration, while the zoom DIPS OUT then climbs back IN
 // to the destination zoom. The dip is computed so the journey fits inside
@@ -2245,8 +2089,8 @@ function zoomForCity(pop) {
 // from OpenLayers' flyTo example.
 //
 // Used by the search palette jumpTo() and by the initial GPS fly-to. The
-// optional `minDuration` lets the GPS path (massive zoom change, often
-// 23+ levels) breathe instead of rushing through in 2.4 s.
+// optional `duration` lets explicit UI navigation stay snappy, while
+// `minDuration` lets the GPS path breathe across a large zoom change.
 function flyTo(targetCenter, targetZoom, options = {}) {
   const currentCenter = view.getCenter();
   const currentZoom = view.getZoom() ?? 2;
@@ -2262,8 +2106,8 @@ function flyTo(targetCenter, targetZoom, options = {}) {
   // Simultaneous mode: a single OL animation that pans and zooms together
   // over the full duration. Used by the GPS fly-to so the camera glides
   // toward the user's location while gradually zooming in — no zoom-out
-  // dip, no pan-then-zoom two-phase feel. The duration is still scaled
-  // by the journey size so a long flight has time to breathe.
+  // dip, no pan-then-zoom two-phase feel. Duration scales with the journey
+  // unless the caller supplies an explicit UI-animation duration.
   if (options.simultaneous) {
     const distance = Math.sqrt(dx * dx + dy * dy);
     const zoomSpan = Math.abs(targetZoom - currentZoom);
@@ -2272,7 +2116,10 @@ function flyTo(targetCenter, targetZoom, options = {}) {
       1000 + zoomSpan * 100,
     );
     const minDuration = options.minDuration ?? 0;
-    const duration = Math.min(4000, Math.max(minDuration, 1100, baseDuration));
+    const duration = options.duration ?? Math.min(
+      4000,
+      Math.max(minDuration, 1100, baseDuration),
+    );
     view.animate({ center: targetCenter, zoom: targetZoom, duration });
     return;
   }
@@ -2328,15 +2175,15 @@ function flyTo(targetCenter, targetZoom, options = {}) {
   );
 }
 
-// Search palette → city: dip the camera all the way out to world view,
-// sweep across, then climb back in to z=15. The pin step ensures the
-// searched city is in the source (and never decluttered) the moment the
-// animation lands.
-const SEARCH_TARGET_ZOOM = 15;
 function jumpTo(city) {
+  cancelAutomaticGeolocation();
   closeSearch();
-  pinSearchedCity(city);
-  flyTo([city.x, city.y], SEARCH_TARGET_ZOOM, { forceMidZoom: 0 });
+  selectSearchedCity(city);
+  view.cancelAnimations();
+  flyTo([city.x, city.y], zoomForCityPopulation(city.population), {
+    simultaneous: true,
+    duration: CITY_NAVIGATION_DURATION_MS,
+  });
 }
 
 searchInput.addEventListener("input", () => {
@@ -2503,8 +2350,8 @@ function getFeatureAtPixel(event) {
     (feature) => (feature.get("featureClass") === "city" ? feature : undefined),
     {
       hitTolerance: 4,
-      // Hit-test any city — they live across bandLayers + alwaysLayer.
-      layerFilter: (layer) => bandLayers.includes(layer) || layer === alwaysLayer,
+      // Hit-test any city — regular labels and persistent search pins.
+      layerFilter: (layer) => layer === cityLayer || layer === alwaysLayer,
     },
   );
 }

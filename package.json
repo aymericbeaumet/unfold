@@ -1,12 +1,24 @@
 {
-  "name": "retromap",
+  "name": "unfold",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "targets": {
+    "default": {
+      "context": "browser",
+      "includeNodeModules": true
+    }
+  },
   "source": "index.html",
   "scripts": {
     "build-data": "node build-data.mjs",
     "dev": "parcel serve -p 9191 index.html",
-    "build": "parcel build --public-url ./ index.html"
+    "build": "parcel build --public-url ./ index.html",
+    "lint": "node --input-type=module --check < main.js && node --check navigation.mjs && node --input-type=module --check < cities-worker.js && node --input-type=module --check < points-worker.js && node --check build-data.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "@fontsource/im-fell-english": "^5.2.6",

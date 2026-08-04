@@ -430,7 +430,7 @@ async function downloadCached(url, filename) {
     try {
       res = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 retromap-build (https://github.com/aymericbeaumet/maps)",
+          "User-Agent": "Mozilla/5.0 unfold-build (https://github.com/aymericbeaumet/unfold)",
           Accept: "application/json, application/geo+json, application/sparql-results+json, */*",
         },
       });
